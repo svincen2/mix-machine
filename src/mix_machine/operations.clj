@@ -31,6 +31,7 @@
         new-word (fs/load-field-spec content-M field)]
     (when DEBUG
       (println "-- LD* --")
+      (println "field" field)
       (println "content-M" content-M)
       (println "new-word" new-word)
       (println "---------"))
@@ -54,6 +55,7 @@
         new-word (d/negate-data (fs/load-field-spec content-M field))]
     (when DEBUG
       (println "-- LDN* --")
+      (println "field" field)
       (println "content-M" content-M)
       (println "new-word" new-word)
       (println "---------"))
@@ -70,15 +72,15 @@
 
 ;; Store operations
 
-(defn st*
+(defn- st*
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
-        register (m/get-register machine reg)
+        register (m/get-register machine reg (d/new-data 5))
         content-M (m/get-memory machine M)
-        new-word (fs/store-field-spec register content-M field)
-        ]
+        new-word (fs/store-field-spec register content-M field)]
     (when DEBUG
       (println "-- ST* --")
+      (println "field" field)
       (println "register" register)
       (println "content-M" content-M)
       (println "new-word" new-word)
@@ -93,10 +95,13 @@
 (def st4 (partial st* [:I 4]))
 (def st5 (partial st* [:I 5]))
 (def st6 (partial st* [:I 6]))
-
-;; I assume...
-;; (defn stn*
-;;   [reg M F machine])
+(def stj (partial st* :J))
+;; Store zero works by passing an invalid register.
+;; This requires st* (above) to call get-register with a default value of +0
+;; (represented as a MIX word)
+;; This is fine, since st* is private, and is only used to create the partial functions
+;; that are actually used.
+(def stz (partial st* :NOT_A_REGISTER))
 
 ;; All operations, keyed 2 ways (once by key, once by code)
 ;; NOTE - fmod is the default F-modification, which is per-instruction.
@@ -136,6 +141,8 @@
    :ST4 {:key :ST4 :code 28 :fmod 5 :fn st4}
    :ST5 {:key :ST5 :code 29 :fmod 5 :fn st5}
    :ST6 {:key :ST6 :code 30 :fmod 5 :fn st6}
+   :STJ {:key :STJ :code 32 :fmod 2 :fn stj}
+   :STZ {:key :STZ :code 33 :fmod 5 :fn stz}
    })
 
 (def operations-by-code
@@ -202,7 +209,7 @@
 
 (defn execute-program
   [machine program]
-  (console/print-machine machine)
+  ;; (console/print-machine machine)
   (println "Executing program...")
   (loop [m machine inst (first program) rem (rest program)]
     (if-not inst

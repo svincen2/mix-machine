@@ -46,7 +46,7 @@
 (defn set-data-sign
   "Set the sign of word."
   [data sign]
-  (assoc-in data :sign sign))
+  (assoc data :sign sign))
 
 (defn truncate-data
   "Truncates some data by dropping the first (left-most) bytes 1, 2, 3, etc...
