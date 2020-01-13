@@ -20,10 +20,10 @@
 (def field-spec-encode-value 8)
 
 (defn decode-field-spec
-  [fs]
-  ;; assume field-spec is a (L:R) form
-  {:left (quot fs field-spec-encode-value)
-   :right (rem fs field-spec-encode-value)})
+  "Decodes the F-modification to a field specification (L:R)."
+  [fmod]
+  {:left (quot fmod field-spec-encode-value)
+   :right (rem fmod field-spec-encode-value)})
 
 (defn encode-field-spec
   [left right]
@@ -31,18 +31,26 @@
       (* field-spec-encode-value)
       (+ right)))
 
-(defn pick-and-shift-bytes
+(defn- load-field-bytes
   [b left right]
   (let [num-bytes (count b)
         range-size (- right left)
         pad (repeat (- num-bytes range-size) 0)]
     (vec (concat pad (subvec b left right)))))
 
-(defn apply-field-spec
+(defn load-field-spec
   [word fs]
   (let [{:keys [left right]} fs
         {:keys [sign bytes]} word]
     (cond
       (and (= 0 left) (= 0 right)) {:sign sign :bytes []}
-      (= 0 left) {:sign sign :bytes (pick-and-shift-bytes bytes 0 right)}
-      :else {:sign :plus :bytes (pick-and-shift-bytes bytes (dec left) right)})))
+      (= 0 left) {:sign sign :bytes (load-field-bytes bytes 0 right)}
+      :else {:sign :plus :bytes (load-field-bytes bytes (dec left) right)})))
+
+(defn store-field-bytes
+  [b left right]
+  )
+
+(defn store-field-spec
+  [data fs]
+  )

@@ -11,16 +11,21 @@
 
 (defn -main
   [& args]
-  (let [mix-machine (atom m/new-mix-machine)]
+  (let [mix-machine (atom m/new-machine)]
     (console/print-machine @mix-machine)
     ;; TESTING
     (-> @mix-machine
-        (assoc-in [:memory 2002] (m/new-word :minus [1 2 3 4 5]))
+        (m/set-memory 2002 (m/new-data :minus [1 2 3 4 5]))
         (console/print-memory 2002)
-        (assoc-in [:registers :I 1] (m/new-word :plus [0 0 0 0 2]))
+        (m/set-memory 1934 (m/new-data :minus [6 7 8 9 10]))
+        (console/print-memory 1934)
+        (m/set-register [:I 1] (m/new-data :plus [0 2]))
         console/print-machine
-        (ops/execute-instruction (m/new-word :plus [31 16 1 11 8]))
-        console/print-machine
+        (ops/execute-program [
+                              (m/new-data :plus [31 16 1 5 15])
+                              (m/new-data :plus [31 16 1 2 10])
+                              (m/new-data :plus [31 16 2 5 16])
+                              ])
         )
     ;; Don't return the entire machine (memory is too much to print...)
     nil
