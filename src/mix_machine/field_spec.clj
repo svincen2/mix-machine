@@ -1,4 +1,7 @@
-(ns mix-machine.field-spec)
+(ns mix-machine.field-spec
+  (:require [mix-machine.data :as d]))
+
+(def DEBUG true)
 
 ;; Field specification:
 ;; Usually of the form (L:R), where L is the left-most byte, and R is the right-most byte
@@ -31,26 +34,29 @@
       (* field-spec-encode-value)
       (+ right)))
 
-(defn- load-field-bytes
-  [b left right]
-  (let [num-bytes (count b)
-        range-size (- right left)
-        pad (repeat (- num-bytes range-size) 0)]
-    (vec (concat pad (subvec b left right)))))
-
 (defn load-field-spec
-  [word fs]
-  (let [{:keys [left right]} fs
+  "LOAD application of a field spec.
+  Returns the field of the word, right shifted.
+  NOTE: This function does not left-pad zeros to ensure
+  a certain number of bytes."
+  [word field]
+  (let [{:keys [left right]} field
         {:keys [sign bytes]} word]
-    (cond
-      (and (= 0 left) (= 0 right)) {:sign sign :bytes []}
-      (= 0 left) {:sign sign :bytes (load-field-bytes bytes 0 right)}
-      :else {:sign :plus :bytes (load-field-bytes bytes (dec left) right)})))
-
-(defn store-field-bytes
-  [b left right]
-  )
+    (d/new-data (if (= 0 left) sign :plus)
+                (subvec bytes (max 0 (dec left)) right))))
 
 (defn store-field-spec
-  [data fs]
-  )
+  "STORE application of a field spec.
+  Replaces the field in dest with the right-most bytes of source.
+  If the field includes the sign, the sign is also replaced.
+  NOTE: Nothing is actually 'replaced' - this function simply returns new data,
+  leaving source, dest, and field untouched."
+  [source dest field]
+  (let [{:keys [left right]} field
+        {s1 :sign b1 :bytes} source
+        {s2 :sign b2 :bytes} dest
+        left-byte (max 0 (dec left))
+        range-size (- right left-byte)
+        nb1 (drop (- (count b1) range-size) b1)]
+    (d/new-data (if (= 0 left) s1 :plus)
+                (vec (concat (take left-byte b2) nb1 (drop right b2))))))

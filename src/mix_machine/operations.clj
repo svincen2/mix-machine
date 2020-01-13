@@ -1,6 +1,7 @@
 (ns mix-machine.operations
   (:require [mix-machine.field-spec :as fs]
             [mix-machine.machine :as m]
+            [mix-machine.data :as d]
             [mix-machine.console :as console]))
 
 (def DEBUG true)
@@ -50,7 +51,7 @@
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
         content-M (m/get-memory machine M)
-        new-word (m/negate-data (fs/load-field-spec content-M field))]
+        new-word (d/negate-data (fs/load-field-spec content-M field))]
     (when DEBUG
       (println "-- LDN* --")
       (println "content-M" content-M)
@@ -70,7 +71,19 @@
 ;; Store operations
 
 (defn st*
-  [reg M F machine])
+  [reg M F machine]
+  (let [field (fs/decode-field-spec F)
+        register (m/get-register machine reg)
+        content-M (m/get-memory machine M)
+        new-word (fs/store-field-spec register content-M field)
+        ]
+    (when DEBUG
+      (println "-- ST* --")
+      (println "register" register)
+      (println "content-M" content-M)
+      (println "new-word" new-word)
+      (println "---------"))
+    (m/set-memory machine M new-word)))
 
 (def sta (partial st* :A))
 (def stx (partial st* :X))
@@ -97,6 +110,7 @@
 ;;                           +|31|16|1|5|8.
 (def operations-by-key
   {
+   ;; Load
    :LDA {:key :LDA :code 8 :fmod 5 :fn lda}
    :LDX {:key :LDX :code 15 :fmod 5 :fn ldx}
    :LD1 {:key :LD1 :code 9 :fmod 5 :fn ld1}
@@ -113,6 +127,15 @@
    :LD4N {:key :LD4N :code 20 :fmod 5 :fn ld4n}
    :LD5N {:key :LD5N :code 21 :fmod 5 :fn ld5n}
    :LD6N {:key :LD6N :code 22 :fmod 5 :fn ld6n}
+   ;; Store
+   :STA {:key :STA :code 24 :fmod 5 :fn sta}
+   :STX {:key :STX :code 31 :fmod 5 :fn stx}
+   :ST1 {:key :ST1 :code 25 :fmod 5 :fn st1}
+   :ST2 {:key :ST2 :code 26 :fmod 5 :fn st2}
+   :ST3 {:key :ST3 :code 27 :fmod 5 :fn st3}
+   :ST4 {:key :ST4 :code 28 :fmod 5 :fn st4}
+   :ST5 {:key :ST5 :code 29 :fmod 5 :fn st5}
+   :ST6 {:key :ST6 :code 30 :fmod 5 :fn st6}
    })
 
 (def operations-by-code
@@ -137,8 +160,8 @@
   (NOTE: if idx is 0, a new-word is used in place of an index register,
    which has the effect of adding 0.  This was done to simplify the code)"
   [machine sign a1 a2 idx]
-  (+ (m/data->num sign [0 0 0 a1 a2])
-     (m/data->num (m/get-register machine [:I idx] (m/new-data 2)))))
+  (+ (d/data->num sign [0 0 0 a1 a2])
+     (d/data->num (m/get-register machine [:I idx] (d/new-data 2)))))
 
 (defn decode-instruction
   "Decode an instruction, returning:
