@@ -15,7 +15,7 @@
 ;; Each should return the new state of the machine.
 
 
-;; Load operations
+;; Load operations -------------------------------------------------------------------------------
 
 (defn- ld*
   "Basic load operation.
@@ -70,7 +70,8 @@
 (def ld5n (partial ldn* [:I 5]))
 (def ld6n (partial ldn* [:I 6]))
 
-;; Store operations
+
+;; Store operations ------------------------------------------------------------------------------
 
 (defn- st*
   [reg M F machine]
@@ -96,12 +97,50 @@
 (def st5 (partial st* [:I 5]))
 (def st6 (partial st* [:I 6]))
 (def stj (partial st* :J))
+
 ;; Store zero works by passing an invalid register.
 ;; This requires st* (above) to call get-register with a default value of +0
 ;; (represented as a MIX word)
 ;; This is fine, since st* is private, and is only used to create the partial functions
 ;; that are actually used.
 (def stz (partial st* :NOT_A_REGISTER))
+
+
+;; Arithmetic operations ------------------------------------------------------------------------
+
+(defn add
+  [M F machine]
+  (let [field (fs/decode-field-spec F)
+        contents-M (m/get-memory machine M)
+        contents-A (m/get-register machine :A)
+        field-M (fs/load-field-spec contents-M field)
+        result (+ (d/data->num contents-A) (d/data->num field-M))
+        new-word (d/num->data result 5)
+        ;; IF result = 0, then the sign stays the same...
+        sign-adj (if (= 0 result)
+                   (d/set-data-sign new-word (:sign contents-A))
+                   new-word)]
+    (when DEBUG
+      (println "field" field)
+      (println "contents-M" contents-M)
+      (println "contents-A" contents-A)
+      (println "field-M" field-M)
+      (println "result" result)
+      (println "new-word" new-word)
+      (println "sign-adj" sign-adj)
+      (println "overflow" (> (d/count-bytes sign-adj) 5))
+      )
+    (-> machine
+        ;; Check overflow - if more than 5 bytes, overflow
+        (m/set-overflow (> (d/count-bytes sign-adj) 5))
+        (m/set-register :A sign-adj))))
+
+(defn sub
+  [M F machine]
+  )
+
+
+;; Operation maps --------------------------------------------------------------------------------
 
 ;; All operations, keyed 2 ways (once by key, once by code)
 ;; NOTE - fmod is the default F-modification, which is per-instruction.
@@ -143,12 +182,16 @@
    :ST6 {:key :ST6 :code 30 :fmod 5 :fn st6}
    :STJ {:key :STJ :code 32 :fmod 2 :fn stj}
    :STZ {:key :STZ :code 33 :fmod 5 :fn stz}
+   ;; Arithmetic
+   :ADD {:key :ADD :code 1 :fmod 5 :fn add}
    })
 
 (def operations-by-code
   (into {} (map (fn [[_ v]] {(:code v) v}) operations-by-key)))
 
-;; Instructions:
+
+;; Instructions ----------------------------------------------------------------------------------
+
 ;; Each instruction is a word:
 ;; Sign | Address 1 | Address 2 | Index | Field Spec | Code
 ;; Sign, the sign part of a word

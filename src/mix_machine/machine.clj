@@ -74,3 +74,8 @@
   [machine m data]
   (assert (<= 0 m 3999))
   (assoc-in machine [:memory m] (d/set-data-size data 5)))
+
+(defn set-overflow
+  [machine of]
+  (assert (boolean? of))
+  (assoc machine :overflow of))
