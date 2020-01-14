@@ -2,7 +2,8 @@
   (:require [mix-machine.field-spec :as fs]
             [mix-machine.machine :as m]
             [mix-machine.data :as d]
-            [mix-machine.console :as console]))
+            [mix-machine.console :as console]
+            [clojure.math.numeric-tower :as math]))
 
 (def DEBUG true)
 
@@ -74,6 +75,11 @@
 ;; Store operations ------------------------------------------------------------------------------
 
 (defn- st*
+  "Basic STORE operation.
+  The number of bytes from the right-most bytes of the register are shifted
+  into the field of M.
+  This is the exact opposite behavior of LOAD.
+  NOTE: The m/get-register call has a default for STZ (store zero) to work."
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
         register (m/get-register machine reg (d/new-data 5))
@@ -97,24 +103,30 @@
 (def st5 (partial st* [:I 5]))
 (def st6 (partial st* [:I 6]))
 (def stj (partial st* :J))
-
 ;; Store zero works by passing an invalid register.
 ;; This requires st* (above) to call get-register with a default value of +0
 ;; (represented as a MIX word)
 ;; This is fine, since st* is private, and is only used to create the partial functions
-;; that are actually used.
+;; where the register is already specified.
 (def stz (partial st* :NOT_A_REGISTER))
 
 
 ;; Arithmetic operations ------------------------------------------------------------------------
 
 (defn add
+  "MIX Addition.
+  The field of CONTENTS(M) is added to the Accumulator.
+  If the result is 0, the Accumulator's sign is unchanged.
+  If the result is too large to fit in the Accumulator,
+  the overflow bit is set to true, and the Accumulator contains
+  the right-most 5 bytes of the result represented in 6 bytes
+  (i.e. [1 b1 b2 b3 b4 b5])."
   [M F machine]
   (let [field (fs/decode-field-spec F)
         contents-M (m/get-memory machine M)
         contents-A (m/get-register machine :A)
-        field-M (fs/load-field-spec contents-M field)
-        result (+ (d/data->num contents-A) (d/data->num field-M))
+        V (fs/load-field-spec contents-M field)
+        result (+ (d/data->num contents-A) (d/data->num V))
         new-word (d/num->data result 5)
         ;; IF result = 0, then the sign stays the same...
         sign-adj (if (= 0 result)
@@ -124,7 +136,7 @@
       (println "field" field)
       (println "contents-M" contents-M)
       (println "contents-A" contents-A)
-      (println "field-M" field-M)
+      (println "V" V)
       (println "result" result)
       (println "new-word" new-word)
       (println "sign-adj" sign-adj)
@@ -136,9 +148,93 @@
         (m/set-register :A sign-adj))))
 
 (defn sub
+  "MIX Subtraction.
+  The field of CONTENTS(M) is subtracted from the Accumulator.
+  This is the same as ADD -CONTENTS(M)."
   [M F machine]
-  )
+  (let [field (fs/decode-field-spec F)
+        contents-M (m/get-memory machine M)
+        contents-A (m/get-register machine :A)
+        V (fs/load-field-spec contents-M field)
+        result (- (d/data->num contents-A) (d/data->num V))
+        new-word (d/num->data result 5)
+        ;; IF result = 0, then the sign stays the same...
+        sign-adj (if (= 0 result)
+                   (d/set-data-sign new-word (:sign contents-A))
+                   new-word)]
+    (when DEBUG
+      (println "field" field)
+      (println "contents-M" contents-M)
+      (println "contents-A" contents-A)
+      (println "V" V)
+      (println "result" result)
+      (println "new-word" new-word)
+      (println "sign-adj" sign-adj)
+      (println "overflow" (> (d/count-bytes sign-adj) 5))
+      )
+    (-> machine
+        ;; Check overflow - if more than 5 bytes, overflow
+        (m/set-overflow (> (d/count-bytes sign-adj) 5))
+        (m/set-register :A sign-adj))))
 
+(defn mul
+  "The 10-byte product of V * rA is stored in rA and rX.
+  Both rA and rX sign's are set to the resulting sign.
+  V is the field of CONTENTS(M)"
+  [M F machine]
+  (let [field (fs/decode-field-spec F)
+        contents-M (m/get-memory machine M)
+        contents-A (m/get-register machine :A)
+        V (fs/load-field-spec contents-M field)
+        result (* (d/data->num contents-A) (d/data->num V))
+        new-word (d/num->data result 10)
+        [new-A new-X] (d/split-data new-word 5)]
+    (when DEBUG
+      (println "field" field)
+      (println "contents-M" contents-M)
+      (println "contents-A" contents-A)
+      (println "V" V)
+      (println "result" result)
+      (println "new-word" new-word)
+      (println "new-A" new-A)
+      (println "new-X" new-X)
+      )
+    (-> machine
+        (m/set-register :A new-A)
+        (m/set-register :X new-X))))
+
+(defn div
+  "The 10-byte number created by rA and rX is divided by V.
+  After division:
+  rA contains the quotient.
+  rX contains the remainder.
+  The sign of rA is the sign of the result.
+  The sign of rX is the previous sign of rA."
+  [M F machine]
+  (let [field (fs/decode-field-spec F)
+        contents-M (m/get-memory machine M)
+        contents-A (m/get-register machine :A)
+        contents-X (m/get-register machine :X)
+        V (d/data->num (fs/load-field-spec contents-M field))
+        rAX (d/data->num (d/merge-data contents-A contents-X))
+        result-A (d/num->data (quot rAX V))
+        result-X (-> (rem rAX V)
+                     d/num->data
+                     (d/set-data-sign (:sign contents-A)))]
+    (when DEBUG
+      (println "field" field)
+      (println "contents-M" contents-M)
+      (println "contents-A" contents-A)
+      (println "contents-X" contents-X)
+      (println "V" V)
+      (println "rAX" rAX)
+      (println "result-A" result-A)
+      (println "result-X" result-X)
+      )
+    ;; TODO - Undefined states...
+    (-> machine
+        (m/set-register :A result-A)
+        (m/set-register :X result-X))))
 
 ;; Operation maps --------------------------------------------------------------------------------
 
@@ -184,6 +280,9 @@
    :STZ {:key :STZ :code 33 :fmod 5 :fn stz}
    ;; Arithmetic
    :ADD {:key :ADD :code 1 :fmod 5 :fn add}
+   :SUB {:key :SUB :code 2 :fmod 5 :fn sub}
+   :MUL {:key :MUL :code 3 :fmod 5 :fn mul}
+   :DIV {:key :DIV :code 4 :fmod 5 :fn div}
    })
 
 (def operations-by-code

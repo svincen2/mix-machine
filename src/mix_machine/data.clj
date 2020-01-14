@@ -1,5 +1,6 @@
 (ns mix-machine.data
-  (:require [clojure.math.numeric-tower :as math]))
+  (:require [clojure.math.numeric-tower :as math]
+            [mix-machine.data :as d]))
 
 ;; NOTE - word is used rather loosely in here
 ;; Technically, a word is a sign and 5 bytes.
@@ -129,10 +130,30 @@
          bytes (loop [bytes (list) n (math/abs num)]
                  (let [q (quot n byte-size)
                        r (rem n byte-size)]
-                   (if (< q byte-size)
-                     (vec (concat (list q r) bytes))
-                     (recur (cons r bytes) q))))
+                   (cond
+                     (= 0 q) (vec (cons r bytes))
+                     (< q byte-size) (vec (concat (list q r) bytes))
+                     :else (recur (cons r bytes) q))))
          data (new-data sign bytes)]
      (if size
        (extend-data data size)
        data))))
+
+(defn split-data
+  "Split the data into chunks, each with size number of bytes.
+  Each chunk will have the same sign as data.
+  If data's bytes cannot be split up evenly, the last chunk will
+  have the remaining bytes."
+  [data size]
+  (let [{:keys [sign bytes]} data]
+    (loop [parts [] rem bytes]
+      (if (empty? rem)
+        parts
+        (recur (conj parts (new-data sign (vec (take size rem))))
+               (drop size rem))))))
+
+(defn merge-data
+  "Merge data together, keeping the sign of the first."
+  [& data]
+  (let [sign (:sign (first data))]
+    (new-data sign (apply into (map :bytes data)))))
