@@ -139,6 +139,20 @@
        (extend-data data size)
        data))))
 
+(defn add-data
+  "Adds MIX data together, returning MIX data.
+  This function does not check for overflow!
+  This function returns (only) as many bytes as is necessary to represent the result!
+  If the result is 0, the sign of the first data element is used as the sign of the result."
+  [& data]
+  (let [sign (:sign (first data))
+        result (reduce + 0 (map data->num data))]
+    ;; If the result is 0, we'll keep the sign of the first data element
+    (if (= 0 result)
+      (-> (num->data result)
+          (set-data-sign sign))
+      (num->data result))))
+
 (defn split-data
   "Split the data into chunks, each with size number of bytes.
   Each chunk will have the same sign as data.

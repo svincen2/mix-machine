@@ -28,7 +28,7 @@
   F is the F-modification."
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
-        content-M (m/get-memory machine M)
+        content-M (m/get-memory machine (d/data->num M))
         new-word (fs/load-field-spec content-M field)]
     (when DEBUG
       (println "-- LD* --")
@@ -52,7 +52,7 @@
   Same as ld*, but negates new-word before storing in a register."
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
-        content-M (m/get-memory machine M)
+        content-M (m/get-memory machine (d/data->num M))
         new-word (d/negate-data (fs/load-field-spec content-M field))]
     (when DEBUG
       (println "-- LDN* --")
@@ -83,7 +83,7 @@
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
         register (m/get-register machine reg (d/new-data 5))
-        content-M (m/get-memory machine M)
+        content-M (m/get-memory machine (d/data->num M))
         new-word (fs/store-field-spec register content-M field)]
     (when DEBUG
       (println "-- ST* --")
@@ -92,7 +92,7 @@
       (println "content-M" content-M)
       (println "new-word" new-word)
       (println "---------"))
-    (m/set-memory machine M new-word)))
+    (m/set-memory machine (d/data->num M) new-word)))
 
 (def sta (partial st* :A))
 (def stx (partial st* :X))
@@ -113,6 +113,35 @@
 
 ;; Arithmetic operations ------------------------------------------------------------------------
 
+(defn- add*
+  "Performs MIX machine addition.
+  machine is a MIX machine.
+  op1 is the first operand.
+  op2 is the second operand.
+  reg is the register in which the result is stored.
+  If the result is 0, the result's sign is the same as op1's sign.
+  If the result is larger than a word, the overflow toggle is set,
+  and the right-most 5 bytes of the result are stored in reg."
+  [machine op1 op2 reg]
+  (let [result (+ (d/data->num op1) (d/data->num op2))
+        new-word (d/num->data result)
+        ;; IF result = 0, then the sign stays the same.
+        sign-adj (if (= 0 result)
+                   (d/set-data-sign new-word (:sign op1))
+                   new-word)
+        ;; If result is too big, overflow is set, otherwise it stays the same.
+        overflow (or (> (d/count-bytes sign-adj) 5)
+                     (m/get-overflow machine))]
+    (when DEBUG
+      (println "result" result)
+      (println "new-word" new-word)
+      (println "sign-adj" sign-adj)
+      (println "overflow" overflow)
+      )
+    (-> machine
+        (m/set-overflow overflow)
+        (m/set-register reg sign-adj))))
+
 (defn add
   "MIX Addition.
   The field of CONTENTS(M) is added to the Accumulator.
@@ -123,59 +152,33 @@
   (i.e. [1 b1 b2 b3 b4 b5])."
   [M F machine]
   (let [field (fs/decode-field-spec F)
-        contents-M (m/get-memory machine M)
+        contents-M (m/get-memory machine (d/data->num M))
         contents-A (m/get-register machine :A)
-        V (fs/load-field-spec contents-M field)
-        result (+ (d/data->num contents-A) (d/data->num V))
-        new-word (d/num->data result 5)
-        ;; IF result = 0, then the sign stays the same...
-        sign-adj (if (= 0 result)
-                   (d/set-data-sign new-word (:sign contents-A))
-                   new-word)]
+        V (fs/load-field-spec contents-M field)]
     (when DEBUG
       (println "field" field)
       (println "contents-M" contents-M)
       (println "contents-A" contents-A)
       (println "V" V)
-      (println "result" result)
-      (println "new-word" new-word)
-      (println "sign-adj" sign-adj)
-      (println "overflow" (> (d/count-bytes sign-adj) 5))
       )
-    (-> machine
-        ;; Check overflow - if more than 5 bytes, overflow
-        (m/set-overflow (> (d/count-bytes sign-adj) 5))
-        (m/set-register :A sign-adj))))
+    (add* machine :A contents-A V)))
 
 (defn sub
   "MIX Subtraction.
   The field of CONTENTS(M) is subtracted from the Accumulator.
-  This is the same as ADD -CONTENTS(M)."
+  Works the same as ADD, except CONTENTS(M) is negated."
   [M F machine]
   (let [field (fs/decode-field-spec F)
-        contents-M (m/get-memory machine M)
+        contents-M (m/get-memory machine (d/data->num M))
         contents-A (m/get-register machine :A)
-        V (fs/load-field-spec contents-M field)
-        result (- (d/data->num contents-A) (d/data->num V))
-        new-word (d/num->data result 5)
-        ;; IF result = 0, then the sign stays the same...
-        sign-adj (if (= 0 result)
-                   (d/set-data-sign new-word (:sign contents-A))
-                   new-word)]
+        V (fs/load-field-spec contents-M field)]
     (when DEBUG
       (println "field" field)
       (println "contents-M" contents-M)
       (println "contents-A" contents-A)
       (println "V" V)
-      (println "result" result)
-      (println "new-word" new-word)
-      (println "sign-adj" sign-adj)
-      (println "overflow" (> (d/count-bytes sign-adj) 5))
       )
-    (-> machine
-        ;; Check overflow - if more than 5 bytes, overflow
-        (m/set-overflow (> (d/count-bytes sign-adj) 5))
-        (m/set-register :A sign-adj))))
+    (add* machine :A contents-A (d/negate-data V))))
 
 (defn mul
   "The 10-byte product of V * rA is stored in rA and rX.
@@ -183,7 +186,7 @@
   V is the field of CONTENTS(M)"
   [M F machine]
   (let [field (fs/decode-field-spec F)
-        contents-M (m/get-memory machine M)
+        contents-M (m/get-memory machine (d/data->num M))
         contents-A (m/get-register machine :A)
         V (fs/load-field-spec contents-M field)
         result (* (d/data->num contents-A) (d/data->num V))
@@ -212,15 +215,11 @@
   The sign of rX is the previous sign of rA."
   [M F machine]
   (let [field (fs/decode-field-spec F)
-        contents-M (m/get-memory machine M)
+        contents-M (m/get-memory machine (d/data->num M))
         contents-A (m/get-register machine :A)
         contents-X (m/get-register machine :X)
         V (d/data->num (fs/load-field-spec contents-M field))
-        rAX (d/data->num (d/merge-data contents-A contents-X))
-        result-A (d/num->data (quot rAX V))
-        result-X (-> (rem rAX V)
-                     d/num->data
-                     (d/set-data-sign (:sign contents-A)))]
+        rAX (d/data->num (d/merge-data contents-A contents-X))]
     (when DEBUG
       (println "field" field)
       (println "contents-M" contents-M)
@@ -228,13 +227,87 @@
       (println "contents-X" contents-X)
       (println "V" V)
       (println "rAX" rAX)
-      (println "result-A" result-A)
-      (println "result-X" result-X)
       )
-    ;; TODO - Undefined states...
-    (-> machine
-        (m/set-register :A result-A)
-        (m/set-register :X result-X))))
+    (if (= 0 V)
+      ;; MIX says undefined information is filled in rA and rX,
+      ;; and the overflow toggle is set
+      ;; So we'll just leave whatever data is in there...
+      (m/set-overflow machine true)
+      (let [result-A (d/num->data (quot rAX V))
+            result-X (-> (rem rAX V)
+                         d/num->data
+                         (d/set-data-sign (:sign contents-A)))
+            ;; Need to also check for overflow here...
+            overflow (or (> (d/count-bytes result-A) 5)
+                         (m/get-overflow machine))]
+        (when DEBUG
+          (println "result-A" result-A)
+          (println "result-X" result-X)
+          (println "overflow" overflow)
+          )
+        (-> machine
+            (m/set-overflow overflow)
+            (m/set-register :A result-A)
+            (m/set-register :X result-X))))))
+
+
+;; Address transfer operations -------------------------------------------------------------------
+
+(defn ent*
+  [reg M F machine]
+  (m/set-register machine reg M))
+
+(def enta (partial ent* :A))
+(def entx (partial ent* :X))
+(def ent1 (partial ent* [:I 1]))
+(def ent2 (partial ent* [:I 2]))
+(def ent3 (partial ent* [:I 3]))
+(def ent4 (partial ent* [:I 4]))
+(def ent5 (partial ent* [:I 5]))
+(def ent6 (partial ent* [:I 6]))
+
+(defn enn*
+  [reg M F machine]
+  (m/set-register machine reg (d/negate-data M)))
+
+(def enna (partial enn* :A))
+(def ennx (partial enn* :X))
+(def enn1 (partial enn* [:I 1]))
+(def enn2 (partial enn* [:I 2]))
+(def enn3 (partial enn* [:I 3]))
+(def enn4 (partial enn* [:I 4]))
+(def enn5 (partial enn* [:I 5]))
+(def enn6 (partial enn* [:I 6]))
+
+(defn- inc*
+  [reg M F machine]
+  (let [contents-M (m/get-memory machine (d/data->num M))
+        contents-R (m/get-register machine reg)]
+    (add* machine reg contents-R contents-M)))
+
+(def inca (partial inc* :A))
+(def incx (partial inc* :X))
+(def inc1 (partial inc* [:I 1]))
+(def inc2 (partial inc* [:I 2]))
+(def inc3 (partial inc* [:I 3]))
+(def inc4 (partial inc* [:I 4]))
+(def inc5 (partial inc* [:I 5]))
+(def inc6 (partial inc* [:I 6]))
+
+(defn- dec*
+  [reg M F machine]
+  (let [contents-M (m/get-memory machine (d/data->num M))
+        contents-R (m/get-register machine reg)]
+    (add* machine reg contents-R (d/negate-data contents-M))))
+
+(def deca (partial dec* :A))
+(def decx (partial dec* :X))
+(def dec1 (partial dec* [:I 1]))
+(def dec2 (partial dec* [:I 2]))
+(def dec3 (partial dec* [:I 3]))
+(def dec4 (partial dec* [:I 4]))
+(def dec5 (partial dec* [:I 5]))
+(def dec6 (partial dec* [:I 6]))
 
 ;; Operation maps --------------------------------------------------------------------------------
 
@@ -283,6 +356,39 @@
    :SUB {:key :SUB :code 2 :fmod 5 :fn sub}
    :MUL {:key :MUL :code 3 :fmod 5 :fn mul}
    :DIV {:key :DIV :code 4 :fmod 5 :fn div}
+   ;; Address transfer
+   :ENTA {:key :ENTA :code 48 :fmod 2 :fn enta}
+   :ENTX {:key :ENTX :code 55 :fmod 2 :fn entx}
+   :ENT1 {:key :ENT1 :code 49 :fmod 2 :fn ent1}
+   :ENT2 {:key :ENT2 :code 50 :fmod 2 :fn ent2}
+   :ENT3 {:key :ENT3 :code 51 :fmod 2 :fn ent3}
+   :ENT4 {:key :ENT4 :code 52 :fmod 2 :fn ent4}
+   :ENT5 {:key :ENT5 :code 53 :fmod 2 :fn ent5}
+   :ENT6 {:key :ENT6 :code 54 :fmod 2 :fn ent6}
+   :ENNA {:key :ENNA :code 48 :fmod 3 :fn enna}
+   :ENNX {:key :ENNX :code 55 :fmod 3 :fn ennx}
+   :ENN1 {:key :ENN1 :code 49 :fmod 3 :fn enn1}
+   :ENN2 {:key :ENN2 :code 50 :fmod 3 :fn enn2}
+   :ENN3 {:key :ENN3 :code 51 :fmod 3 :fn enn3}
+   :ENN4 {:key :ENN4 :code 52 :fmod 3 :fn enn4}
+   :ENN5 {:key :ENN5 :code 53 :fmod 3 :fn enn5}
+   :ENN6 {:key :ENN6 :code 54 :fmod 3 :fn enn6}
+   :INCA {:key :INCA :code 48 :fmod 0 :fn inca}
+   :INCX {:key :INCX :code 55 :fmod 0 :fn incx}
+   :INC1 {:key :INC1 :code 49 :fmod 0 :fn inc1}
+   :INC2 {:key :INC2 :code 50 :fmod 0 :fn inc2}
+   :INC3 {:key :INC3 :code 51 :fmod 0 :fn inc3}
+   :INC4 {:key :INC4 :code 52 :fmod 0 :fn inc4}
+   :INC5 {:key :INC5 :code 53 :fmod 0 :fn inc5}
+   :INC6 {:key :INC6 :code 54 :fmod 0 :fn inc6}
+   :DECA {:key :DECA :code 48 :fmod 1 :fn deca}
+   :DECX {:key :DECX :code 55 :fmod 1 :fn decx}
+   :DEC1 {:key :DEC1 :code 49 :fmod 1 :fn dec1}
+   :DEC2 {:key :DEC2 :code 50 :fmod 1 :fn dec2}
+   :DEC3 {:key :DEC3 :code 51 :fmod 1 :fn dec3}
+   :DEC4 {:key :DEC4 :code 52 :fmod 1 :fn dec4}
+   :DEC5 {:key :DEC5 :code 53 :fmod 1 :fn dec5}
+   :DEC6 {:key :DEC6 :code 54 :fmod 1 :fn dec6}
    })
 
 (def operations-by-code
@@ -309,8 +415,8 @@
   (NOTE: if idx is 0, a new-word is used in place of an index register,
    which has the effect of adding 0.  This was done to simplify the code)"
   [machine sign a1 a2 idx]
-  (+ (d/data->num sign [0 0 0 a1 a2])
-     (d/data->num (m/get-register machine [:I idx] (d/new-data 2)))))
+  (d/add-data (d/new-data sign [0 0 0 a1 a2])
+              (m/get-register machine [:I idx] (d/new-data 2))))
 
 (defn decode-instruction
   "Decode an instruction, returning:
