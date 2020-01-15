@@ -82,7 +82,9 @@
   NOTE: The m/get-register call has a default for STZ (store zero) to work."
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
-        register (m/get-register machine reg (d/new-data 5))
+        register (-> (m/get-register machine reg (d/new-data 5))
+                     ;; Extend smaller registers
+                     (d/extend-data 5))
         content-M (m/get-memory machine (d/data->num M))
         new-word (fs/store-field-spec register content-M field)]
     (when DEBUG
@@ -133,6 +135,9 @@
         overflow (or (> (d/count-bytes sign-adj) 5)
                      (m/get-overflow machine))]
     (when DEBUG
+      (println "op1" op1)
+      (println "op2" op2)
+      (println "reg" reg)
       (println "result" result)
       (println "new-word" new-word)
       (println "sign-adj" sign-adj)
@@ -161,7 +166,7 @@
       (println "contents-A" contents-A)
       (println "V" V)
       )
-    (add* machine :A contents-A V)))
+    (add* machine contents-A V :A)))
 
 (defn sub
   "MIX Subtraction.
@@ -178,7 +183,7 @@
       (println "contents-A" contents-A)
       (println "V" V)
       )
-    (add* machine :A contents-A (d/negate-data V))))
+    (add* machine contents-A (d/negate-data V) :A)))
 
 (defn mul
   "The 10-byte product of V * rA is stored in rA and rX.
@@ -253,6 +258,8 @@
 
 ;; Address transfer operations -------------------------------------------------------------------
 
+;; TODO - TEST THESE
+
 (defn ent*
   [reg M F machine]
   (m/set-register machine reg M))
@@ -281,9 +288,11 @@
 
 (defn- inc*
   [reg M F machine]
-  (let [contents-M (m/get-memory machine (d/data->num M))
-        contents-R (m/get-register machine reg)]
-    (add* machine reg contents-R contents-M)))
+  (let [contents-R (m/get-register machine reg)]
+    (when DEBUG
+      (println "contents-R" contents-R)
+      )
+    (add* machine contents-R M reg)))
 
 (def inca (partial inc* :A))
 (def incx (partial inc* :X))
@@ -296,9 +305,11 @@
 
 (defn- dec*
   [reg M F machine]
-  (let [contents-M (m/get-memory machine (d/data->num M))
-        contents-R (m/get-register machine reg)]
-    (add* machine reg contents-R (d/negate-data contents-M))))
+  (let [contents-R (m/get-register machine reg)]
+    (when DEBUG
+      (println "contents-R" contents-R)
+      )
+    (add* machine contents-R (d/negate-data M) reg)))
 
 (def deca (partial dec* :A))
 (def decx (partial dec* :X))
@@ -309,10 +320,36 @@
 (def dec5 (partial dec* [:I 5]))
 (def dec6 (partial dec* [:I 6]))
 
+
+;; Comparison operations -------------------------------------------------------------------------
+
+(defn- cmp*
+  [reg M F machine]
+  (let [field (fs/decode-field-spec F)
+        contents-R (-> (m/get-register machine reg)
+                       ;; Need to shift the smaller registers before loading the field
+                       (d/set-data-size 5)
+                       (fs/load-field-spec field))
+        contents-M (-> (m/get-memory machine (d/data->num M))
+                       (fs/load-field-spec field))
+        result (compare (d/data->num contents-R) (d/data->num contents-M))]
+    (m/set-condition-indicator machine ({-1 :less 0 :equal 1 :greater} result))))
+
+(def cmpa (partial cmp* :A))
+(def cmpx (partial cmp* :X))
+(def cmp1 (partial cmp* [:I 1]))
+(def cmp2 (partial cmp* [:I 2]))
+(def cmp3 (partial cmp* [:I 3]))
+(def cmp4 (partial cmp* [:I 4]))
+(def cmp5 (partial cmp* [:I 5]))
+(def cmp6 (partial cmp* [:I 6]))
+
+
 ;; Operation maps --------------------------------------------------------------------------------
 
-;; All operations, keyed 2 ways (once by key, once by code)
+;; All operations
 ;; NOTE - fmod is the default F-modification, which is per-instruction.
+;; NOTE - fmod is occasionally used to distinguish between two operations with the same op code.
 ;; There's a couple things to note here:
 ;; 1. 0 is a valid fmod, which means for instructions where there is no F written,
 ;;    the default must be used.
@@ -321,78 +358,100 @@
 ;;    Example: LDA 2000,1 => +|31|16|1|F|8
 ;;    The above example does not specify an fmod, so for LDA, we use the default 5:
 ;;                           +|31|16|1|5|8.
-(def operations-by-key
-  {
+(def ^:private operations
+  [
    ;; Load
-   :LDA {:key :LDA :code 8 :fmod 5 :fn lda}
-   :LDX {:key :LDX :code 15 :fmod 5 :fn ldx}
-   :LD1 {:key :LD1 :code 9 :fmod 5 :fn ld1}
-   :LD2 {:key :LD2 :code 10 :fmod 5 :fn ld2}
-   :LD3 {:key :LD3 :code 11 :fmod 5 :fn ld3}
-   :LD4 {:key :LD4 :code 12 :fmod 5 :fn ld4}
-   :LD5 {:key :LD5 :code 13 :fmod 5 :fn ld5}
-   :LD6 {:key :LD6 :code 14 :fmod 5 :fn ld6}
-   :LDAN {:key :LDAN :code 16 :fmod 5 :fn ldan}
-   :LDXN {:key :LDXN :code 23 :fmod 5 :fn ldxn}
-   :LD1N {:key :LD1N :code 17 :fmod 5 :fn ld1n}
-   :LD2N {:key :LD2N :code 18 :fmod 5 :fn ld2n}
-   :LD3N {:key :LD3N :code 19 :fmod 5 :fn ld3n}
-   :LD4N {:key :LD4N :code 20 :fmod 5 :fn ld4n}
-   :LD5N {:key :LD5N :code 21 :fmod 5 :fn ld5n}
-   :LD6N {:key :LD6N :code 22 :fmod 5 :fn ld6n}
+   {:key :LDA :code 8 :fmod 5 :fn lda}
+   {:key :LDX :code 15 :fmod 5 :fn ldx}
+   {:key :LD1 :code 9 :fmod 5 :fn ld1}
+   {:key :LD2 :code 10 :fmod 5 :fn ld2}
+   {:key :LD3 :code 11 :fmod 5 :fn ld3}
+   {:key :LD4 :code 12 :fmod 5 :fn ld4}
+   {:key :LD5 :code 13 :fmod 5 :fn ld5}
+   {:key :LD6 :code 14 :fmod 5 :fn ld6}
+   {:key :LDAN :code 16 :fmod 5 :fn ldan}
+   {:key :LDXN :code 23 :fmod 5 :fn ldxn}
+   {:key :LD1N :code 17 :fmod 5 :fn ld1n}
+   {:key :LD2N :code 18 :fmod 5 :fn ld2n}
+   {:key :LD3N :code 19 :fmod 5 :fn ld3n}
+   {:key :LD4N :code 20 :fmod 5 :fn ld4n}
+   {:key :LD5N :code 21 :fmod 5 :fn ld5n}
+   {:key :LD6N :code 22 :fmod 5 :fn ld6n}
    ;; Store
-   :STA {:key :STA :code 24 :fmod 5 :fn sta}
-   :STX {:key :STX :code 31 :fmod 5 :fn stx}
-   :ST1 {:key :ST1 :code 25 :fmod 5 :fn st1}
-   :ST2 {:key :ST2 :code 26 :fmod 5 :fn st2}
-   :ST3 {:key :ST3 :code 27 :fmod 5 :fn st3}
-   :ST4 {:key :ST4 :code 28 :fmod 5 :fn st4}
-   :ST5 {:key :ST5 :code 29 :fmod 5 :fn st5}
-   :ST6 {:key :ST6 :code 30 :fmod 5 :fn st6}
-   :STJ {:key :STJ :code 32 :fmod 2 :fn stj}
-   :STZ {:key :STZ :code 33 :fmod 5 :fn stz}
+   {:key :STA :code 24 :fmod 5 :fn sta}
+   {:key :STX :code 31 :fmod 5 :fn stx}
+   {:key :ST1 :code 25 :fmod 5 :fn st1}
+   {:key :ST2 :code 26 :fmod 5 :fn st2}
+   {:key :ST3 :code 27 :fmod 5 :fn st3}
+   {:key :ST4 :code 28 :fmod 5 :fn st4}
+   {:key :ST5 :code 29 :fmod 5 :fn st5}
+   {:key :ST6 :code 30 :fmod 5 :fn st6}
+   {:key :STJ :code 32 :fmod 2 :fn stj}
+   {:key :STZ :code 33 :fmod 5 :fn stz}
    ;; Arithmetic
-   :ADD {:key :ADD :code 1 :fmod 5 :fn add}
-   :SUB {:key :SUB :code 2 :fmod 5 :fn sub}
-   :MUL {:key :MUL :code 3 :fmod 5 :fn mul}
-   :DIV {:key :DIV :code 4 :fmod 5 :fn div}
+   {:key :ADD :code 1 :fmod 5 :fn add}
+   {:key :SUB :code 2 :fmod 5 :fn sub}
+   {:key :MUL :code 3 :fmod 5 :fn mul}
+   {:key :DIV :code 4 :fmod 5 :fn div}
    ;; Address transfer
-   :ENTA {:key :ENTA :code 48 :fmod 2 :fn enta}
-   :ENTX {:key :ENTX :code 55 :fmod 2 :fn entx}
-   :ENT1 {:key :ENT1 :code 49 :fmod 2 :fn ent1}
-   :ENT2 {:key :ENT2 :code 50 :fmod 2 :fn ent2}
-   :ENT3 {:key :ENT3 :code 51 :fmod 2 :fn ent3}
-   :ENT4 {:key :ENT4 :code 52 :fmod 2 :fn ent4}
-   :ENT5 {:key :ENT5 :code 53 :fmod 2 :fn ent5}
-   :ENT6 {:key :ENT6 :code 54 :fmod 2 :fn ent6}
-   :ENNA {:key :ENNA :code 48 :fmod 3 :fn enna}
-   :ENNX {:key :ENNX :code 55 :fmod 3 :fn ennx}
-   :ENN1 {:key :ENN1 :code 49 :fmod 3 :fn enn1}
-   :ENN2 {:key :ENN2 :code 50 :fmod 3 :fn enn2}
-   :ENN3 {:key :ENN3 :code 51 :fmod 3 :fn enn3}
-   :ENN4 {:key :ENN4 :code 52 :fmod 3 :fn enn4}
-   :ENN5 {:key :ENN5 :code 53 :fmod 3 :fn enn5}
-   :ENN6 {:key :ENN6 :code 54 :fmod 3 :fn enn6}
-   :INCA {:key :INCA :code 48 :fmod 0 :fn inca}
-   :INCX {:key :INCX :code 55 :fmod 0 :fn incx}
-   :INC1 {:key :INC1 :code 49 :fmod 0 :fn inc1}
-   :INC2 {:key :INC2 :code 50 :fmod 0 :fn inc2}
-   :INC3 {:key :INC3 :code 51 :fmod 0 :fn inc3}
-   :INC4 {:key :INC4 :code 52 :fmod 0 :fn inc4}
-   :INC5 {:key :INC5 :code 53 :fmod 0 :fn inc5}
-   :INC6 {:key :INC6 :code 54 :fmod 0 :fn inc6}
-   :DECA {:key :DECA :code 48 :fmod 1 :fn deca}
-   :DECX {:key :DECX :code 55 :fmod 1 :fn decx}
-   :DEC1 {:key :DEC1 :code 49 :fmod 1 :fn dec1}
-   :DEC2 {:key :DEC2 :code 50 :fmod 1 :fn dec2}
-   :DEC3 {:key :DEC3 :code 51 :fmod 1 :fn dec3}
-   :DEC4 {:key :DEC4 :code 52 :fmod 1 :fn dec4}
-   :DEC5 {:key :DEC5 :code 53 :fmod 1 :fn dec5}
-   :DEC6 {:key :DEC6 :code 54 :fmod 1 :fn dec6}
-   })
+   ;; NOTE - These require lookup by code and fmod
+   {:key :ENTA :code 48 :fmod 2 :fn enta}
+   {:key :ENTX :code 55 :fmod 2 :fn entx}
+   {:key :ENT1 :code 49 :fmod 2 :fn ent1}
+   {:key :ENT2 :code 50 :fmod 2 :fn ent2}
+   {:key :ENT3 :code 51 :fmod 2 :fn ent3}
+   {:key :ENT4 :code 52 :fmod 2 :fn ent4}
+   {:key :ENT5 :code 53 :fmod 2 :fn ent5}
+   {:key :ENT6 :code 54 :fmod 2 :fn ent6}
+   {:key :ENNA :code 48 :fmod 3 :fn enna}
+   {:key :ENNX :code 55 :fmod 3 :fn ennx}
+   {:key :ENN1 :code 49 :fmod 3 :fn enn1}
+   {:key :ENN2 :code 50 :fmod 3 :fn enn2}
+   {:key :ENN3 :code 51 :fmod 3 :fn enn3}
+   {:key :ENN4 :code 52 :fmod 3 :fn enn4}
+   {:key :ENN5 :code 53 :fmod 3 :fn enn5}
+   {:key :ENN6 :code 54 :fmod 3 :fn enn6}
+   {:key :INCA :code 48 :fmod 0 :fn inca}
+   {:key :INCX :code 55 :fmod 0 :fn incx}
+   {:key :INC1 :code 49 :fmod 0 :fn inc1}
+   {:key :INC2 :code 50 :fmod 0 :fn inc2}
+   {:key :INC3 :code 51 :fmod 0 :fn inc3}
+   {:key :INC4 :code 52 :fmod 0 :fn inc4}
+   {:key :INC5 :code 53 :fmod 0 :fn inc5}
+   {:key :INC6 :code 54 :fmod 0 :fn inc6}
+   {:key :DECA :code 48 :fmod 1 :fn deca}
+   {:key :DECX :code 55 :fmod 1 :fn decx}
+   {:key :DEC1 :code 49 :fmod 1 :fn dec1}
+   {:key :DEC2 :code 50 :fmod 1 :fn dec2}
+   {:key :DEC3 :code 51 :fmod 1 :fn dec3}
+   {:key :DEC4 :code 52 :fmod 1 :fn dec4}
+   {:key :DEC5 :code 53 :fmod 1 :fn dec5}
+   {:key :DEC6 :code 54 :fmod 1 :fn dec6}
+   ;; Comparison
+   {:key :CMPA :code 56 :fmod 5 :fn cmpa}
+   {:key :CMPX :code 63 :fmod 5 :fn cmpx}
+   {:key :CMP1 :code 57 :fmod 5 :fn cmp1}
+   {:key :CMP2 :code 58 :fmod 5 :fn cmp2}
+   {:key :CMP3 :code 59 :fmod 5 :fn cmp3}
+   {:key :CMP4 :code 60 :fmod 5 :fn cmp4}
+   {:key :CMP5 :code 61 :fmod 5 :fn cmp5}
+   {:key :CMP6 :code 62 :fmod 5 :fn cmp6}
+   ])
 
-(def operations-by-code
-  (into {} (map (fn [[_ v]] {(:code v) v}) operations-by-key)))
+(def ^:private operations-by-code (group-by :code operations))
+
+(defn lookup-op
+  "Look up the operation that corresponds to code and fmod.
+  For most operations, the code is enough for lookup.
+  However some operations share the same code (ENTA and INCA for example),
+  and use the F-modification to distinguish between them."
+  [code fmod]
+  (let [possible-ops (get operations-by-code code)]
+    (if (= 1 (count possible-ops))
+      ;; Only one option, return it
+      (first possible-ops)
+      ;; Re-map possibe-ops by fmod to find the op we want
+      (get (zipmap (map :fmod possible-ops) possible-ops) fmod))))
 
 
 ;; Instructions ----------------------------------------------------------------------------------
@@ -437,7 +496,7 @@
       (println "------------------------"))
     {:M M
      :F fmod
-     :op (operations-by-code code)}))
+     :op (lookup-op code fmod)}))
 
 (defn execute-instruction
   "Execute an instruction.

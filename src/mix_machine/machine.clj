@@ -24,8 +24,7 @@
    :condition-indicator :equal
    :memory (vec (repeat 4000 (d/new-data 5)))})
 
-;; NOTE UNUSED
-(def condition-indicator? #{:less :equal :greater})
+(def valid-condition-indicator? #{:less :equal :greater})
 
 (defn- get-index-register
   "Returns the index register i, if possible.
@@ -83,3 +82,12 @@
   [machine of]
   (assert (boolean? of))
   (assoc machine :overflow of))
+
+(defn get-condition-indicator
+  [machine]
+  (get machine :condition-indicator))
+
+(defn set-condition-indicator
+  [machine ci]
+  (assert (valid-condition-indicator? ci))
+  (assoc machine :condition-indicator ci))
