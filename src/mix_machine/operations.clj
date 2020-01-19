@@ -345,6 +345,138 @@
 (def cmp6 (partial cmp* [:I 6]))
 
 
+;; Jump operations -------------------------------------------------------------------------------
+
+;; NOTE - The following operations do a few strange things worth noting:
+;; 1. When setting the program counter from M, M is always decremented by 1.
+;;    This is because the program counter is always increased by 1 at the end
+;;    of each instruction.  So jump instruction can't load the actual address of the next
+;;    instruction; they need to load address - 1
+;; 2. When storing the program counter in the J register, it is incremented first.
+;;    This makes sense, since jump operations (except JSJ) store the next instruction
+;;    in J as a return address
+
+(defn jmp
+  [M F machine]
+  (let [pc (m/get-program-counter machine)]
+    (-> machine
+        (m/set-program-counter (dec (d/data->num M)))
+        (m/set-register :J (d/num->data (inc pc))))))
+
+(defn jsj
+  [M F machine]
+  (m/set-program-counter machine (dec (d/data->num M))))
+
+;; TODO - TEST THESE
+
+(defn- jmpp
+  [p M F machine]
+  (if p
+    (jmp M F machine)
+    machine))
+
+(defn- jov*
+  [of M F machine]
+  (let [overflow (m/get-overflow machine)
+        m2 (m/set-overflow machine false)]
+    (jmpp (= of overflow) M F m2)))
+
+(def jov (partial jov* true))
+(def jnov (partial jov* false))
+
+(defn- jci*
+  "Jump if the condition indicator conforms to ci-desc.
+  ci-desc is a vec with a predicate, followed by a condition.
+  The predicate can be = or not.
+  Jumps if (predicate condition condition-indicator) returns true.
+  So, for example, a ci-desc of [not :greater] will check
+  if the condition indicator is not :greater, (i.e. :less or :equal)."
+  [ci-desc M F machine]
+  (let [ci (m/get-condition-indicator machine)
+        [p c] ci-desc]
+    (jmpp (p c ci) M F machine)))
+
+(def jl (partial jci* [= :less]))
+(def je (partial jci* [= :equal]))
+(def jg (partial jci* [= :greater]))
+(def jge (partial jci* [not :less]))
+(def jne (partial jci* [not :equal]))
+(def jle (partial jci* [not :greater]))
+
+(defn ja*
+  [p M F machine]
+  (let [contents-A (d/data->num (m/get-register machine :A))]
+    (jmpp (p contents-A 0) M F machine)))
+
+(def jan (partial ja* <))
+(def jaz (partial ja* =))
+(def jap (partial ja* >))
+(def jann (partial ja* >=))
+(def janz (partial ja* not=))
+(def janp (partial ja* <=))
+
+(defn jx*
+  [p M F machine]
+  (let [contents-X (d/data->num (m/get-register machine :X))]
+    (jmpp (p contents-X 0) M F machine)))
+
+(def jxn (partial jx* <))
+(def jxz (partial jx* =))
+(def jxp (partial jx* >))
+(def jxnn (partial jx* >=))
+(def jxnz (partial jx* not=))
+(def jxnp (partial jx* <=))
+
+(defn ji*
+  [i p M F machine]
+  (let [contents-I (d/data->num (m/get-register machine [:I i]))]
+    (jmpp (p contents-I 0) M F machine)))
+
+(def j1n (partial ji* 1 <))
+(def j1z (partial ji* 1 =))
+(def j1p (partial ji* 1 >))
+(def j1nn (partial ji* 1 >=))
+(def j1nz (partial ji* 1 not=))
+(def j1np (partial ji* 1 <=))
+
+(def j2n (partial ji* 2 <))
+(def j2z (partial ji* 2 =))
+(def j2p (partial ji* 2 >))
+(def j2nn (partial ji* 2 >=))
+(def j2nz (partial ji* 2 not=))
+(def j2np (partial ji* 2 <=))
+
+(def j3n (partial ji* 3 <))
+(def j3z (partial ji* 3 =))
+(def j3p (partial ji* 3 >))
+(def j3nn (partial ji* 3 >=))
+(def j3nz (partial ji* 3 not=))
+(def j3np (partial ji* 3 <=))
+
+(def j4n (partial ji* 4 <))
+(def j4z (partial ji* 4 =))
+(def j4p (partial ji* 4 >))
+(def j4nn (partial ji* 4 >=))
+(def j4nz (partial ji* 4 not=))
+(def j4np (partial ji* 4 <=))
+
+(def j5n (partial ji* 5 <))
+(def j5z (partial ji* 5 =))
+(def j5p (partial ji* 5 >))
+(def j5nn (partial ji* 5 >=))
+(def j5nz (partial ji* 5 not=))
+(def j5np (partial ji* 5 <=))
+
+(def j6n (partial ji* 6 <))
+(def j6z (partial ji* 6 =))
+(def j6p (partial ji* 6 >))
+(def j6nn (partial ji* 6 >=))
+(def j6nz (partial ji* 6 not=))
+(def j6np (partial ji* 6 <=))
+
+
+;; Shift operations ------------------------------------------------------------------------------
+
 ;; Operation maps --------------------------------------------------------------------------------
 
 ;; All operations
@@ -436,6 +568,81 @@
    {:key :CMP4 :code 60 :fmod 5 :fn cmp4}
    {:key :CMP5 :code 61 :fmod 5 :fn cmp5}
    {:key :CMP6 :code 62 :fmod 5 :fn cmp6}
+   ;; Jump
+   {:key :JMP :code 39 :fmod 0 :fn jmp}
+   {:key :JSJ :code 39 :fmod 1 :fn jsj}
+   ;; Jump overflow
+   {:key :JOV :code 39 :fmod 2 :fn jov}
+   {:key :JNOV :code 39 :fmod 3 :fn jnov}
+   ;; Jump condition indicator
+   {:key :JL :code 39 :fmod 4 :fn jl}
+   {:key :JE :code 39 :fmod 5 :fn je}
+   {:key :JG :code 39 :fmod 6 :fn jg}
+   {:key :JGE :code 39 :fmod 7 :fn jge}
+   {:key :JNE :code 39 :fmod 8 :fn jne}
+   {:key :JLE :code 39 :fmod 9 :fn jle}
+   ;; Jump Accumulator
+   {:key :JAN :code 40 :fmod 0 :fn jan}
+   {:key :JAZ :code 40 :fmod 1 :fn jaz}
+   {:key :JAP :code 40 :fmod 2 :fn jap}
+   {:key :JANN :code 40 :fmod 3 :fn jann}
+   {:key :JANZ :code 40 :fmod 4 :fn janz}
+   {:key :JANP :code 40 :fmod 5 :fn janp}
+   ;; Jump Extension
+   {:key :JXN :code 47 :fmod 0 :fn jxn}
+   {:key :JXZ :code 47 :fmod 1 :fn jxz}
+   {:key :JXP :code 47 :fmod 2 :fn jxp}
+   {:key :JXNN :code 47 :fmod 3 :fn jxnn}
+   {:key :JXNZ :code 47 :fmod 4 :fn jxnz}
+   {:key :JXNP :code 47 :fmod 5 :fn jxnp}
+   ;; Jump I1
+   {:key :J1N  :code 41 :fmod 0 :fn j1n}
+   {:key :J1Z  :code 41 :fmod 1 :fn j1z}
+   {:key :J1P  :code 41 :fmod 2 :fn j1p}
+   {:key :J1NN :code 41 :fmod 3 :fn j1nn}
+   {:key :J1NZ :code 41 :fmod 4 :fn j1nz}
+   {:key :J1NP :code 41 :fmod 5 :fn j1np}
+   ;; Jump I2
+   {:key :J2N  :code 42 :fmod 0 :fn j2n}
+   {:key :J2Z  :code 42 :fmod 1 :fn j2z}
+   {:key :J2P  :code 42 :fmod 2 :fn j2p}
+   {:key :J2NN :code 42 :fmod 3 :fn j2nn}
+   {:key :J2NZ :code 42 :fmod 4 :fn j2nz}
+   {:key :J2NP :code 42 :fmod 5 :fn j2np}
+   ;; Jump I3
+   {:key :J3N  :code 43 :fmod 0 :fn j3n}
+   {:key :J3Z  :code 43 :fmod 1 :fn j3z}
+   {:key :J3P  :code 43 :fmod 2 :fn j3p}
+   {:key :J3NN :code 43 :fmod 3 :fn j3nn}
+   {:key :J3NZ :code 43 :fmod 4 :fn j3nz}
+   {:key :J3NP :code 43 :fmod 5 :fn j3np}
+   ;; Jump I4
+   {:key :J4N  :code 44 :fmod 0 :fn j4n}
+   {:key :J4Z  :code 44 :fmod 1 :fn j4z}
+   {:key :J4P  :code 44 :fmod 2 :fn j4p}
+   {:key :J4NN :code 44 :fmod 3 :fn j4nn}
+   {:key :J4NZ :code 44 :fmod 4 :fn j4nz}
+   {:key :J4NP :code 44 :fmod 5 :fn j4np}
+   ;; Jump I5
+   {:key :J5N  :code 45 :fmod 0 :fn j5n}
+   {:key :J5Z  :code 45 :fmod 1 :fn j5z}
+   {:key :J5P  :code 45 :fmod 2 :fn j5p}
+   {:key :J5NN :code 45 :fmod 3 :fn j5nn}
+   {:key :J5NZ :code 45 :fmod 4 :fn j5nz}
+   {:key :J5NP :code 45 :fmod 5 :fn j5np}
+   ;; Jump I6
+   {:key :J6N  :code 46 :fmod 0 :fn j6n}
+   {:key :J6Z  :code 46 :fmod 1 :fn j6z}
+   {:key :J6P  :code 46 :fmod 2 :fn j6p}
+   {:key :J6NN :code 46 :fmod 3 :fn j6nn}
+   {:key :J6NZ :code 46 :fmod 4 :fn j6nz}
+   {:key :J6NP :code 46 :fmod 5 :fn j6np}
+   ;; Shift
+
+   ;; Halt
+   {:key :HLT :code 5 :fmod 2 :fn nil}
+   ;; No-op
+   {:key :NOP :code 0 :fmod 0 :fn nil}
    ])
 
 (def ^:private operations-by-code (group-by :code operations))
@@ -498,33 +705,64 @@
      :F fmod
      :op (lookup-op code fmod)}))
 
-(defn execute-instruction
-  "Execute an instruction.
-  Decodes and executes a machine instruction,
-  returning the new state of the machine."
-  [machine inst]
-  (let [{:keys [M F op]} (decode-instruction machine inst)
-        op-fn (:fn op)]
+;; TODO - Deprecated
+;; (defn execute-instruction
+;;   "Execute an instruction.
+;;   Decodes and executes a machine instruction,
+;;   returning the new state of the machine."
+;;   [machine inst]
+;;   (let [{:keys [M F op]} (decode-instruction machine inst)
+;;         op-fn (:fn op)]
+;;     (when DEBUG
+;;       (println "-- execute-instruction --")
+;;       (println "M" M)
+;;       (println "F" F)
+;;       (println "op" op)
+;;       (println "op-fn" op-fn)
+;;       (println "-------------------------"))
+;;     (op-fn M F machine)))
+
+(defn execute-next-instruction
+  [machine]
+  (let [pc (m/get-program-counter machine)
+        inst (m/get-memory machine pc)
+        {:keys [M F op]} (decode-instruction machine inst)
+        {op-fn :fn key :key} op]
     (when DEBUG
-      (println "-- execute-instruction --")
+      (println "-- execute-next-instruction --")
       (println "M" M)
       (println "F" F)
       (println "op" op)
       (println "op-fn" op-fn)
+      (println "key" key)
       (println "-------------------------"))
-    (op-fn M F machine)))
+    (-> (case key
+          :HLT [machine true]
+          :NOP [machine false]
+          [(op-fn M F machine) false])
+        ;; Increment program counter
+        (update 0 m/inc-program-counter))))
+
+(defn load-program
+  [machine program address]
+  (println "Loading program...")
+  (let [m2 (reduce (fn [m [idx inst]]
+                     (m/set-memory m (+ address idx) inst))
+                   (m/set-program-counter machine address)
+                   (map-indexed vector program))]
+    (println "Loading program...DONE")
+    (console/print-memory m2 address (+ address (count program)))
+    m2))
 
 (defn execute-program
-  [machine program]
+  [machine]
   ;; (console/print-machine machine)
   (println "Executing program...")
-  (loop [m machine inst (first program) rem (rest program)]
-    (if-not inst
-      (do
-        (println "Executing program...DONE")
-        m)
-      (let [m2 (execute-instruction m inst)]
-        ;; We can do stuff here, like print the machine,
-        ;; wait for input, etc...
-        (console/print-machine m2)
-        (recur m2 (first rem) (rest rem))))))
+  (loop [m machine]
+    (console/print-machine m)
+    (let [[m2 halted?] (execute-next-instruction m)]
+      (if halted?
+        (do
+          (println "Executing program...DONE")
+          m2)
+        (recur m2)))))

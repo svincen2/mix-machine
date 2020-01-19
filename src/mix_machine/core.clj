@@ -13,7 +13,7 @@
 (defn -main
   [& args]
   (let [mix-machine (atom m/new-machine)]
-    (console/print-machine @mix-machine)
+    ;; (console/print-machine @mix-machine)
     ;; TEST 1 (load / store)
     ;; (-> @mix-machine
     ;;     (m/set-memory 2002 (d/new-data :minus [1 2 3 4 5]))
@@ -55,12 +55,19 @@
     ;;     (console/print-machine))
     ;; TEST 4 comparison
     (-> @mix-machine
-        (ops/execute-program [
-                              (d/new-data :minus [0 1 0 2 48]) ;; ENTA -1
-                              ;; (d/new-data :plus [1 36 0 5 24]) ;; STA 2000
-                              (d/new-data :plus [1 36 0 5 56]) ;; CMPA 2000
-                              (d/new-data :plus [1 36 0 5 63]) ;; CMPA 2000
-                              ]))
+        (ops/load-program [
+                           (d/new-data :minus [0 1 0 2 48]) ;; ENTA -1
+                           (d/new-data :plus [1 36 0 5 24]) ;; STA 2000
+                           ;; (d/new-data :plus [0 4 0 0 39]) ;; JMP 4
+                           (d/new-data :plus [0 4 0 1 39]) ;; JSJ 4
+                           (d/new-data :plus [1 36 0 5 56]) ;; CMPA 2000
+                           (d/new-data :plus [1 36 0 5 63]) ;; CMPA 2000
+                           (d/new-data :plus [0 0 0 2 5]) ;; HLT
+                           ]
+                          0)
+        ops/execute-program
+        (console/print-machine)
+        )
 
     ;; Don't return the entire machine (memory is too much to print...)
     nil

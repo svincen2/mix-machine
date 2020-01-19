@@ -45,7 +45,7 @@
    (println (format "M[%s]:" address) (word->str (get-in mix-machine [:memory address])))
    mix-machine)
   ([mix-machine addr1 addr2]
-   (dorun (map (partial print-memory mix-machine) (range addr1 (inc addr2))))))
+   (dorun (map (partial print-memory mix-machine) (range addr1 addr2)))))
 
 ;; (defn print-program
 ;;   [program]

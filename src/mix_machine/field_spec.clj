@@ -29,6 +29,8 @@
    :right (rem fmod field-spec-encode-value)})
 
 (defn encode-field-spec
+  "Encodes a field spec to a machine F-modification value.
+  This is equivalent to (field-spec-encode-value * left) + right."
   [left right]
   (-> left
       (* field-spec-encode-value)

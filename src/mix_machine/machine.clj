@@ -22,7 +22,11 @@
                :J (d/new-data 2)}
    :overflow false
    :condition-indicator :equal
-   :memory (vec (repeat 4000 (d/new-data 5)))})
+   :memory (vec (repeat 4000 (d/new-data 5)))
+   ;; NOTE - For now, we'll just assume the program is loaded into memory 0,
+   ;; in order (i.e. memory 0 contains first instruction, memory 1 contains the second, etc...)
+   :program-counter 0
+   })
 
 (def valid-condition-indicator? #{:less :equal :greater})
 
@@ -91,3 +95,17 @@
   [machine ci]
   (assert (valid-condition-indicator? ci))
   (assoc machine :condition-indicator ci))
+
+(defn get-program-counter
+  [machine]
+  (get machine :program-counter))
+
+(defn set-program-counter
+  [machine pc]
+  (assert (int? pc))
+  (assert (<= 0 pc 3999))
+  (assoc machine :program-counter pc))
+
+(defn inc-program-counter
+  [machine]
+  (update machine :program-counter inc))
