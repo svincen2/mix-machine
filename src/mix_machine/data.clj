@@ -32,13 +32,6 @@
   [data]
   (count (:bytes data)))
 
-;; (defn valid-word?
-;;   "Returns whether data is a valid MIX word."
-;;   [data]
-;;   (and (valid-sign? (:sign data))
-;;        (valid-bytes? (:bytes data))
-;;        (= 5 (count-bytes data))))
-
 (defn negate-data
   "Negates the sign of a the data."
   [data]
@@ -85,10 +78,10 @@
      (throw (ex-info "new-data: Invalid sign" {:arg sign})))
    (cond
      (int? num-or-bytes) {:sign sign :bytes (vec (repeat num-or-bytes 0))}
-     (vector? num-or-bytes) (if-not (valid-bytes? num-or-bytes)
-                              (throw (ex-info "new-data: Invalid bytes"
-                                              {:arg num-or-bytes}))
-                              {:sign sign :bytes num-or-bytes})
+     (sequential? num-or-bytes) (if-not (valid-bytes? num-or-bytes)
+                                  (throw (ex-info "new-data: Invalid bytes"
+                                                  {:arg num-or-bytes}))
+                                  {:sign sign :bytes (vec num-or-bytes)})
      :else (throw (ex-info "new-data: Expected a number or vector"
                            {:arg num-or-bytes})))))
 
@@ -131,8 +124,8 @@
                  (let [q (quot n byte-size)
                        r (rem n byte-size)]
                    (cond
-                     (= 0 q) (vec (cons r bytes))
-                     (< q byte-size) (vec (concat (list q r) bytes))
+                     (= 0 q) (cons r bytes)
+                     (< q byte-size) (concat (list q r) bytes)
                      :else (recur (cons r bytes) q))))
          data (new-data sign bytes)]
      (if size
@@ -163,7 +156,7 @@
     (loop [parts [] rem bytes]
       (if (empty? rem)
         parts
-        (recur (conj parts (new-data sign (vec (take size rem))))
+        (recur (conj parts (new-data sign (take size rem)))
                (drop size rem))))))
 
 (defn merge-data
@@ -171,3 +164,37 @@
   [& data]
   (let [sign (:sign (first data))]
     (new-data sign (apply into (map :bytes data)))))
+
+(defn shift-left
+  [data n]
+  (let [{:keys [sign bytes]} data
+        shift (min (count bytes) n)]
+    (new-data sign (concat (drop shift bytes)
+                           (repeat shift 0)))))
+
+(defn shift-right
+  [data n]
+  (let [{:keys [sign bytes]} data
+        num-bytes (count bytes)
+        shift (min num-bytes n)
+        keep (- num-bytes shift)]
+    (new-data sign (concat (repeat shift 0)
+                           (take keep bytes)))))
+
+;; TODO - Should there be a limit on this??
+;; Basically what I do now is mod by data size, to get rid of the complete cycles.
+(defn cycle-left
+  [data n]
+  (let [{:keys [sign bytes]} data
+        shift (mod n (count bytes))]
+    (new-data sign (concat (drop shift bytes)
+                           (take shift bytes)))))
+
+(defn cycle-right
+  [data n]
+  (let [{:keys [sign bytes]} data
+        num-bytes (count bytes)
+        shift (mod n (count bytes))
+        keep (- num-bytes shift)]
+    (new-data sign (concat (drop keep bytes)
+                           (take keep bytes)))))

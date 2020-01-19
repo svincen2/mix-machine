@@ -403,7 +403,7 @@
 (def jne (partial jci* [not :equal]))
 (def jle (partial jci* [not :greater]))
 
-(defn ja*
+(defn- ja*
   [p M F machine]
   (let [contents-A (d/data->num (m/get-register machine :A))]
     (jmpp (p contents-A 0) M F machine)))
@@ -415,7 +415,7 @@
 (def janz (partial ja* not=))
 (def janp (partial ja* <=))
 
-(defn jx*
+(defn- jx*
   [p M F machine]
   (let [contents-X (d/data->num (m/get-register machine :X))]
     (jmpp (p contents-X 0) M F machine)))
@@ -427,7 +427,7 @@
 (def jxnz (partial jx* not=))
 (def jxnp (partial jx* <=))
 
-(defn ji*
+(defn- ji*
   [i p M F machine]
   (let [contents-I (d/data->num (m/get-register machine [:I i]))]
     (jmpp (p contents-I 0) M F machine)))
@@ -476,6 +476,35 @@
 
 
 ;; Shift operations ------------------------------------------------------------------------------
+
+;; TODO - TEST THESE
+
+(defn- sa*
+  [shift M F machine]
+  (let [contents-A (m/get-register machine :A)]
+    ;; TODO - M must be nonnegative, but MIX doesn't define what happens if it isn't...
+    (m/set-register machine :A (shift contents-A (d/data->num M)))))
+
+(def sla (partial sa* d/shift-left))
+(def sra (partial sa* d/shift-right))
+
+(defn- sax*
+  [shift M F machine]
+  (let [contents-A (m/get-register machine :A)
+        contents-X (m/get-register machine :X)
+        sign-X (:sign contents-X)
+        contents-AX (d/merge-data contents-A contents-X)
+        shifted (shift contents-AX (d/data->num M))
+        [rA rX] (d/split-data shifted 5)]
+    (-> machine
+        (m/set-register :A rA)
+        (m/set-register :X (d/set-data-sign rX sign-X)))))
+
+(def slax (partial sax* d/shift-left))
+(def srax (partial sax* d/shift-right))
+(def slc (partial sax* d/cycle-left))
+(def src (partial sax* d/cycle-right))
+
 
 ;; Operation maps --------------------------------------------------------------------------------
 
@@ -638,11 +667,18 @@
    {:key :J6NZ :code 46 :fmod 4 :fn j6nz}
    {:key :J6NP :code 46 :fmod 5 :fn j6np}
    ;; Shift
+   {:key :SLA :code 6 :fmod 0 :fn sla}
+   {:key :SRA :code 6 :fmod 1 :fn sra}
+   {:key :SLAX :code 6 :fmod 2 :fn slax}
+   {:key :SRAX :code 6 :fmod 3 :fn srax}
+   {:key :SLC :code 6 :fmod 4 :fn slc}
+   {:key :SRC :code 6 :fmod 5 :fn src}
+   ;; Move
 
-   ;; Halt
-   {:key :HLT :code 5 :fmod 2 :fn nil}
    ;; No-op
    {:key :NOP :code 0 :fmod 0 :fn nil}
+   ;; Halt
+   {:key :HLT :code 5 :fmod 2 :fn nil}
    ])
 
 (def ^:private operations-by-code (group-by :code operations))
@@ -704,23 +740,6 @@
     {:M M
      :F fmod
      :op (lookup-op code fmod)}))
-
-;; TODO - Deprecated
-;; (defn execute-instruction
-;;   "Execute an instruction.
-;;   Decodes and executes a machine instruction,
-;;   returning the new state of the machine."
-;;   [machine inst]
-;;   (let [{:keys [M F op]} (decode-instruction machine inst)
-;;         op-fn (:fn op)]
-;;     (when DEBUG
-;;       (println "-- execute-instruction --")
-;;       (println "M" M)
-;;       (println "F" F)
-;;       (println "op" op)
-;;       (println "op-fn" op-fn)
-;;       (println "-------------------------"))
-;;     (op-fn M F machine)))
 
 (defn execute-next-instruction
   [machine]
