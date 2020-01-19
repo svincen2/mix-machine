@@ -3,7 +3,8 @@
             [mix-machine.machine :as m]
             [mix-machine.data :as d]
             [mix-machine.console :as console]
-            [clojure.math.numeric-tower :as math]))
+            [clojure.math.numeric-tower :as math]
+            [mix-machine.device :as dev]))
 
 (def DEBUG false)
 (def PRINT true)
@@ -508,9 +509,11 @@
 (def src (partial sax* d/cycle-right))
 
 
-;; Move ------------------------------------------------------------------------------------------
+;; Move operation --------------------------------------------------------------------------------
 
 (defn move
+  "Moves F number of words from location M to the location pointed at
+  by rI1.  Afterwards, rI1 is increased by F.  If F = 0, does nothing."
   [M F machine]
   (if (= 0 F)
     machine
@@ -530,6 +533,24 @@
                 (range F))
         (m/inc-register m [:I 1] (d/num->data F))))))
 
+
+;; I/O operations --------------------------------------------------------------------------------
+
+(defn in
+  "Reads from device identified by F into memory locations starting at M.
+  Reads (:block-size device) words from the device."
+  [M F machine]
+  (let [block (dev/in (m/get-device machine F))]
+    (m/set-memory machine (d/data->num M) block)))
+
+(defn out
+  "Writes to device identified by F the memory locations starting at M.
+  Writes (:block-size device) words to the device."
+  [M F machine]
+  (let [block-size (get-in (m/get-device machine F) [:device :size])
+        block (m/get-memory machine (d/data->num M) block-size)]
+    (-> machine
+        (m/update-device F dev/out block))))
 
 ;; Operation maps --------------------------------------------------------------------------------
 
@@ -700,6 +721,10 @@
    {:key :SRC :code 6 :fmod 5 :fn src}
    ;; Move
    {:key :MOVE :code 7 :fmod 1 :fn move}
+   ;; I/O
+   {:key :IN :code 36 :fmod nil :fn in}
+   {:key :OUT :code 37 :fmod nil :fn out}
+   ;; {:key :IOC :code :fmod nil :fn ioc}
    ;; No-op
    {:key :NOP :code 0 :fmod 0 :fn nil}
    ;; Halt

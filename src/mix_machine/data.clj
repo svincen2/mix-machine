@@ -2,7 +2,7 @@
   (:refer-clojure :rename {merge clj-merge
                            extend clj-extend})
   (:require [clojure.math.numeric-tower :as math]
-            [mix-machine.data :as d]))
+            [mix-machine.char :as ch]))
 
 ;; NOTE - word is used rather loosely in here
 ;; Technically, a word is a sign and 5 bytes.
@@ -225,3 +225,11 @@
 ;;        (e.g. 6-bit, 2-decimal, 4-ternary, etc...)"
 ;;   [size]
 ;;   (new-data :plus (repeat size byte-max)))
+
+(defn data->chars
+  [data]
+  (vec (map ch/code->char (:bytes data))))
+
+(defn chars->data
+  [chs]
+  (new-data :plus (map ch/char->code chs)))

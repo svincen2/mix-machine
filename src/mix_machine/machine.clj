@@ -1,5 +1,6 @@
 (ns mix-machine.machine
-  (:require [mix-machine.data :as d]))
+  (:require [mix-machine.data :as d]
+            [mix-machine.device :as dev]))
 
 
 ;; Machine:
@@ -26,6 +27,14 @@
    ;; NOTE - For now, we'll just assume the program is loaded into memory 0,
    ;; in order (i.e. memory 0 contains first instruction, memory 1 contains the second, etc...)
    :program-counter 0
+   ;; NOTE - You'll need to add the devices you want with add-device
+   :devices {:tape (vec (repeat 8 nil))
+             :disk (vec (repeat 8 nil))
+             :card-reader nil
+             :card-punch nil
+             :line-printer nil
+             :typewriter nil
+             :paper-tape nil}
    })
 
 (def valid-condition-indicator? #{:less :equal :greater})
@@ -75,13 +84,23 @@
     (set-register machine r (d/add contents-R data))))
 
 (defn get-memory
-  [machine m]
-  (get-in machine [:memory m]))
+  ([machine m]
+   (get-in machine [:memory m]))
+  ([machine m size]
+   (subvec (:memory machine) m (+ m size))))
 
 (defn set-memory
   [machine m data]
   (assert (<= 0 m 3999))
-  (assoc-in machine [:memory m] (d/set-size data 5)))
+  (if (sequential? data)
+    (let [sized-data (map #(d/set-size % 5) data)
+          data-len (count data)
+          mem (:memory machine)
+          front (take m mem)
+          back (drop (+ m data-len) mem)
+          mem2 (take 4000 (concat front sized-data back))]
+      (assoc machine :memory (vec mem2)))
+    (assoc-in machine [:memory m] (d/set-size data 5))))
 
 (defn get-overflow
   [machine]
@@ -114,3 +133,36 @@
 (defn inc-program-counter
   [machine]
   (update machine :program-counter inc))
+
+(defn add-device
+  [machine loc device]
+  (assoc-in machine (cons :devices loc) device))
+
+(defn- lookup-device
+  "Find the machine location of the device identified by device-code."
+  [device-code]
+  (cond
+    (<= 0 device-code 7) [:tape device-code]
+    (<= 8 device-code 15) [:disk (- device-code 8)]
+    (= 16 device-code) :card-reader
+    (= 17 device-code) :card-punch
+    (= 18 device-code) :line-printer
+    (= 19 device-code) :typewriter
+    (= 20 device-code) :paper-tape
+    :else (throw (ex-info "lookup-device: Unknown device code" {:code device-code}))))
+
+(defn get-device
+  "Return the device identified by device.
+  device can be either a device code, or a device machine location."
+  [machine code-or-loc]
+  (let [device-loc (if (int? code-or-loc) (lookup-device code-or-loc) code-or-loc)]
+    (get-in machine (cons :devices device-loc))))
+
+(defn update-device
+  "Update device identified by device-code,
+  by calling f with the device as the first argument, followed by args.
+  This is equivalent to (apply f device args), but returns a machine
+  with the device update in-place."
+  [machine device-code f & args]
+  (let [device-loc (lookup-device device-code)]
+    (apply update-in machine (cons :devices device-loc) f args)))

@@ -1,5 +1,6 @@
 (ns mix-machine.console
-  (:require [mix-machine.machine :as m]))
+  (:require [mix-machine.machine :as m]
+            [mix-machine.debug :refer [debug]]))
 
 (defn sign->str
   [data]
@@ -49,3 +50,8 @@
   [data]
   (dorun
    (map-indexed (fn [i d] (println (format "%04d: %25s" i (data->str d)))) data)))
+
+(defn print-device
+  [mix-machine d]
+  (let [device (m/get-device mix-machine d)]
+    (debug device)))
