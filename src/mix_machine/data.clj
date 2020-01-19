@@ -1,4 +1,6 @@
 (ns mix-machine.data
+  (:refer-clojure :rename {merge clj-merge
+                           extend clj-extend})
   (:require [clojure.math.numeric-tower :as math]
             [mix-machine.data :as d]))
 
@@ -12,13 +14,14 @@
 ;; Word: Sign, 5 bytes
 
 (def byte-size 64)
+(def byte-max (dec byte-size))
 
 (defn valid-byte?
   "Returns whether b is a valid MIX byte.
   Valid bytes are numeric values in range [0, 64)."
   [b]
   (and (int? b)
-       (<= 0 b (dec byte-size))))
+       (<= 0 b byte-max)))
 
 (defn valid-bytes?
   "Returns whether bs is a collection of valid bytes."
@@ -32,17 +35,17 @@
   [data]
   (count (:bytes data)))
 
-(defn negate-data
+(defn negate
   "Negates the sign of a the data."
   [data]
   (update data :sign #({:plus :minus :minus :plus} %)))
 
-(defn set-data-sign
+(defn set-sign
   "Set the sign of word."
   [data sign]
   (assoc data :sign sign))
 
-(defn truncate-data
+(defn truncate
   "Truncates some data by dropping the first (left-most) bytes 1, 2, 3, etc...
   Example, truncate 5 to 2 bytes: S|b1|b2|b3|b4|b5 => S|b4|b5."
   [data size]
@@ -50,7 +53,7 @@
     (update data :bytes #(->> % reverse (take size) reverse vec))
     data))
 
-(defn extend-data
+(defn extend
   "Extend data to fit the new size (expected to be bigger).
   Extends by adding 0s to the left.
   Example, extend 2 to 5 bytes: S|b1|b2 => S|0|0|0|b1|b2."
@@ -59,11 +62,11 @@
     (update data :bytes #(into (vec (repeat (- size (count %)) 0)) %))
     data))
 
-(defn set-data-size
+(defn set-size
   "Fixes the data size to a new size, which can be bigger or smaller.
   To save information, extension (if necessary) is performed before truncation."
   [data size]
-  (-> data (extend-data size) (truncate-data size)))
+  (-> data (extend size) (truncate size)))
 
 (defn new-data
   "Create new MIX data of a given size.
@@ -115,7 +118,7 @@
   as are needed to represent num.
   In the second form, the data returned can be extended to a certain size,
   however size cannot be used to truncate.  If you need to do that,
-  pass the result of this function into a call to truncate-data. "
+  pass the result of this function into a call to truncate. "
   ([num]
    (num->data num nil))
   ([num size]
@@ -129,10 +132,10 @@
                      :else (recur (cons r bytes) q))))
          data (new-data sign bytes)]
      (if size
-       (extend-data data size)
+       (extend data size)
        data))))
 
-(defn add-data
+(defn add
   "Adds MIX data together, returning MIX data.
   This function does not check for overflow!
   This function returns (only) as many bytes as is necessary to represent the result!
@@ -143,10 +146,10 @@
     ;; If the result is 0, we'll keep the sign of the first data element
     (if (= 0 result)
       (-> (num->data result)
-          (set-data-sign sign))
+          (set-sign sign))
       (num->data result))))
 
-(defn split-data
+(defn split
   "Split the data into chunks, each with size number of bytes.
   Each chunk will have the same sign as data.
   If data's bytes cannot be split up evenly, the last chunk will
@@ -159,13 +162,18 @@
         (recur (conj parts (new-data sign (take size rem)))
                (drop size rem))))))
 
-(defn merge-data
+(defn merge
   "Merge data together, keeping the sign of the first."
   [& data]
   (let [sign (:sign (first data))]
     (new-data sign (apply into (map :bytes data)))))
 
 (defn shift-left
+  "Shift n bytes left.
+  Left-most bytes are shifted out.
+  Zeros replace right-most bytes.
+  Sign is unchanged.
+  Example: +|1|2|3|4|5 shift 3 => +|4|5|0|0|0."
   [data n]
   (let [{:keys [sign bytes]} data
         shift (min (count bytes) n)]
@@ -173,6 +181,11 @@
                            (repeat shift 0)))))
 
 (defn shift-right
+  "Shift n bytes right.
+  Right-most bytes are shifted out.
+  Zeros replace left-most bytes.
+  Sign is unchanged.
+  Example: +|1|2|3|4|5 shift 3 => +|0|0|0|1|2."
   [data n]
   (let [{:keys [sign bytes]} data
         num-bytes (count bytes)
@@ -181,9 +194,11 @@
     (new-data sign (concat (repeat shift 0)
                            (take keep bytes)))))
 
-;; TODO - Should there be a limit on this??
-;; Basically what I do now is mod by data size, to get rid of the complete cycles.
 (defn cycle-left
+  "Cycle n bytes left.
+  Right-most bytes are replaced by left-most bytes.
+  Sign is unchanged.
+  Example: +|1|2|3|4|5 cycle 3 => +|4|5|1|2|3."
   [data n]
   (let [{:keys [sign bytes]} data
         shift (mod n (count bytes))]
@@ -191,6 +206,10 @@
                            (take shift bytes)))))
 
 (defn cycle-right
+  "Cycle n bytes right.
+  Left-most bytes are replaced by right-most bytes.
+  Sign is unchanged.
+  Example: +|1|2|3|4|5 cycle 3 => +|3|4|5|1|2."
   [data n]
   (let [{:keys [sign bytes]} data
         num-bytes (count bytes)
@@ -198,3 +217,11 @@
         keep (- num-bytes shift)]
     (new-data sign (concat (drop keep bytes)
                            (take keep bytes)))))
+
+;; (defn max-value
+;;   "Return MIX data of size representing the max value.
+;;   NOTE A \"maximum value\" is defined for this implementation only!
+;;        MIX makes no assumptions about max values and byte implementations.
+;;        (e.g. 6-bit, 2-decimal, 4-ternary, etc...)"
+;;   [size]
+;;   (new-data :plus (repeat size byte-max)))

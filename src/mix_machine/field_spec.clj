@@ -36,6 +36,11 @@
       (* field-spec-encode-value)
       (+ right)))
 
+(defn field-spec-str
+  [fmod]
+  (let [{:keys [left right]} (decode-field-spec fmod)]
+    (format "(%d:%d)" left right)))
+
 (defn load-field-spec
   "LOAD application of a field spec.
   Returns the field of the word, right shifted.
@@ -61,4 +66,4 @@
         range-size (- right left-byte)
         nb1 (drop (- (count b1) range-size) b1)]
     (d/new-data (if (= 0 left) s1 s2)
-                (vec (concat (take left-byte b2) nb1 (drop right b2))))))
+                (concat (take left-byte b2) nb1 (drop right b2)))))

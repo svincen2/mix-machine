@@ -5,7 +5,8 @@
             [mix-machine.console :as console]
             [clojure.math.numeric-tower :as math]))
 
-(def DEBUG true)
+(def DEBUG false)
+(def PRINT true)
 
 ;; Actual operations
 ;;
@@ -53,7 +54,7 @@
   [reg M F machine]
   (let [field (fs/decode-field-spec F)
         content-M (m/get-memory machine (d/data->num M))
-        new-word (d/negate-data (fs/load-field-spec content-M field))]
+        new-word (d/negate (fs/load-field-spec content-M field))]
     (when DEBUG
       (println "-- LDN* --")
       (println "field" field)
@@ -84,13 +85,14 @@
   (let [field (fs/decode-field-spec F)
         register (-> (m/get-register machine reg (d/new-data 5))
                      ;; Extend smaller registers
-                     (d/extend-data 5))
+                     (d/extend 5))
         content-M (m/get-memory machine (d/data->num M))
         new-word (fs/store-field-spec register content-M field)]
     (when DEBUG
       (println "-- ST* --")
       (println "field" field)
       (println "register" register)
+      (println "M" (d/data->num M))
       (println "content-M" content-M)
       (println "new-word" new-word)
       (println "---------"))
@@ -129,7 +131,7 @@
         new-word (d/num->data result)
         ;; IF result = 0, then the sign stays the same.
         sign-adj (if (= 0 result)
-                   (d/set-data-sign new-word (:sign op1))
+                   (d/set-sign new-word (:sign op1))
                    new-word)
         ;; If result is too big, overflow is set, otherwise it stays the same.
         overflow (or (> (d/count-bytes sign-adj) 5)
@@ -183,7 +185,7 @@
       (println "contents-A" contents-A)
       (println "V" V)
       )
-    (add* machine contents-A (d/negate-data V) :A)))
+    (add* machine contents-A (d/negate V) :A)))
 
 (defn mul
   "The 10-byte product of V * rA is stored in rA and rX.
@@ -196,7 +198,7 @@
         V (fs/load-field-spec contents-M field)
         result (* (d/data->num contents-A) (d/data->num V))
         new-word (d/num->data result 10)
-        [new-A new-X] (d/split-data new-word 5)]
+        [new-A new-X] (d/split new-word 5)]
     (when DEBUG
       (println "field" field)
       (println "contents-M" contents-M)
@@ -224,7 +226,7 @@
         contents-A (m/get-register machine :A)
         contents-X (m/get-register machine :X)
         V (d/data->num (fs/load-field-spec contents-M field))
-        rAX (d/data->num (d/merge-data contents-A contents-X))]
+        rAX (d/data->num (d/merge contents-A contents-X))]
     (when DEBUG
       (println "field" field)
       (println "contents-M" contents-M)
@@ -241,7 +243,7 @@
       (let [result-A (d/num->data (quot rAX V))
             result-X (-> (rem rAX V)
                          d/num->data
-                         (d/set-data-sign (:sign contents-A)))
+                         (d/set-sign (:sign contents-A)))
             ;; Need to also check for overflow here...
             overflow (or (> (d/count-bytes result-A) 5)
                          (m/get-overflow machine))]
@@ -275,7 +277,7 @@
 
 (defn enn*
   [reg M F machine]
-  (m/set-register machine reg (d/negate-data M)))
+  (m/set-register machine reg (d/negate M)))
 
 (def enna (partial enn* :A))
 (def ennx (partial enn* :X))
@@ -309,7 +311,7 @@
     (when DEBUG
       (println "contents-R" contents-R)
       )
-    (add* machine contents-R (d/negate-data M) reg)))
+    (add* machine contents-R (d/negate M) reg)))
 
 (def deca (partial dec* :A))
 (def decx (partial dec* :X))
@@ -328,7 +330,7 @@
   (let [field (fs/decode-field-spec F)
         contents-R (-> (m/get-register machine reg)
                        ;; Need to shift the smaller registers before loading the field
-                       (d/set-data-size 5)
+                       (d/set-size 5)
                        (fs/load-field-spec field))
         contents-M (-> (m/get-memory machine (d/data->num M))
                        (fs/load-field-spec field))
@@ -493,17 +495,40 @@
   (let [contents-A (m/get-register machine :A)
         contents-X (m/get-register machine :X)
         sign-X (:sign contents-X)
-        contents-AX (d/merge-data contents-A contents-X)
+        contents-AX (d/merge contents-A contents-X)
         shifted (shift contents-AX (d/data->num M))
-        [rA rX] (d/split-data shifted 5)]
+        [rA rX] (d/split shifted 5)]
     (-> machine
         (m/set-register :A rA)
-        (m/set-register :X (d/set-data-sign rX sign-X)))))
+        (m/set-register :X (d/set-sign rX sign-X)))))
 
 (def slax (partial sax* d/shift-left))
 (def srax (partial sax* d/shift-right))
 (def slc (partial sax* d/cycle-left))
 (def src (partial sax* d/cycle-right))
+
+
+;; Move ------------------------------------------------------------------------------------------
+
+(defn move
+  [M F machine]
+  (if (= 0 F)
+    machine
+    (let [source (d/data->num M)
+          dest (d/data->num (m/get-register machine [:I 1]))]
+      (when DEBUG
+        (println "-- MOVE --")
+        (println "source" source)
+        (println "dest" dest)
+        (println "----------")
+        )
+      (as-> machine m
+        (reduce (fn [m i]
+                  (let [data (m/get-memory m (+ source i))]
+                    (m/set-memory m (+ dest i) data)))
+                m
+                (range F))
+        (m/inc-register m [:I 1] (d/num->data F))))))
 
 
 ;; Operation maps --------------------------------------------------------------------------------
@@ -674,7 +699,7 @@
    {:key :SLC :code 6 :fmod 4 :fn slc}
    {:key :SRC :code 6 :fmod 5 :fn src}
    ;; Move
-
+   {:key :MOVE :code 7 :fmod 1 :fn move}
    ;; No-op
    {:key :NOP :code 0 :fmod 0 :fn nil}
    ;; Halt
@@ -717,8 +742,8 @@
   (NOTE: if idx is 0, a new-word is used in place of an index register,
    which has the effect of adding 0.  This was done to simplify the code)"
   [machine sign a1 a2 idx]
-  (d/add-data (d/new-data sign [0 0 0 a1 a2])
-              (m/get-register machine [:I idx] (d/new-data 2))))
+  (d/add (d/new-data sign [0 0 0 a1 a2])
+         (m/get-register machine [:I idx] (d/new-data 2))))
 
 (defn decode-instruction
   "Decode an instruction, returning:
@@ -729,14 +754,14 @@
   (let [sign (:sign inst)
         [a1 a2 idx fmod code] (:bytes inst)
         M (create-indexed-address machine sign a1 a2 idx)]
-    (when DEBUG
-      (println "-- decode-instruction --")
-      (println "address parts" sign a1 a2)
-      (println "index" idx)
-      (println "F modification" fmod)
-      (println "code" code)
-      (println "M" M)
-      (println "------------------------"))
+    (when PRINT
+      (println "\nDecode Instruction")
+      (println (format "-- %-7s %20d" "Address" (d/data->num sign [a1 a2])))
+      (println (format "-- %-7s %20d" "Index" idx))
+      (println (format "-- %-15s %12s" "F modification"
+                       (str fmod " " (fs/field-spec-str fmod))))
+      (println (format "-- %-7s %20d" "Code" code))
+      )
     {:M M
      :F fmod
      :op (lookup-op code fmod)}))
@@ -747,14 +772,12 @@
         inst (m/get-memory machine pc)
         {:keys [M F op]} (decode-instruction machine inst)
         {op-fn :fn key :key} op]
-    (when DEBUG
-      (println "-- execute-next-instruction --")
-      (println "M" M)
-      (println "F" F)
-      (println "op" op)
-      (println "op-fn" op-fn)
-      (println "key" key)
-      (println "-------------------------"))
+    (when PRINT
+      (println "\nExecute Operation")
+      (println (format "-- %-7s %20s" "Name" (name key)))
+      (println (format "-- %-7s %20d" "M" (d/data->num M)))
+      (println (format "-- %-7s %20s" "F" F (fs/field-spec-str F)))
+      )
     (-> (case key
           :HLT [machine true]
           :NOP [machine false]
@@ -764,24 +787,28 @@
 
 (defn load-program
   [machine program address]
-  (println "Loading program...")
-  (let [m2 (reduce (fn [m [idx inst]]
-                     (m/set-memory m (+ address idx) inst))
-                   (m/set-program-counter machine address)
-                   (map-indexed vector program))]
-    (println "Loading program...DONE")
-    (console/print-memory m2 address (+ address (count program)))
-    m2))
+  (when PRINT
+    (println "\nLoad Program")
+    (println (format "%-10s %20s" "Address" address))
+    (console/print-data-numbered program))
+  (reduce (fn [m [idx inst]]
+            (m/set-memory m (+ address idx) inst))
+          (m/set-program-counter machine address)
+          (map-indexed vector program)))
 
 (defn execute-program
   [machine]
-  ;; (console/print-machine machine)
-  (println "Executing program...")
+  (when PRINT
+    (println "\nExecuting program"))
   (loop [m machine]
     (console/print-machine m)
+    (print "\nPress any key to continue ")
+    (flush)
+    (read-line)
+    (println)
     (let [[m2 halted?] (execute-next-instruction m)]
       (if halted?
         (do
-          (println "Executing program...DONE")
+          (println "\nProgram terminated")
           m2)
         (recur m2)))))
