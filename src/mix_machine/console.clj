@@ -28,23 +28,23 @@
   (println (format "-- %-7s %20s" "rJ" (data->str (:J registers)))))
 
 (defn print-machine
-  [mix-machine]
+  [machine]
   (println "\nMachine")
-  (print-registers (:registers mix-machine))
-  (println (format "-- %-9s %18b" "Overflow" (:overflow mix-machine)))
-  (println (format "-- %-9s %18s" "Condition" (name (:condition-indicator mix-machine))))
+  (print-registers (:registers machine))
+  (println (format "-- %-9s %18b" "Overflow" (:overflow machine)))
+  (println (format "-- %-9s %18s" "Condition" (name (:condition-indicator machine))))
   ;; Return the machine, so we can chain this in a thread macro
-  mix-machine)
+  machine)
 
 (defn print-memory
-  [mix-machine & ranges]
+  [machine & ranges]
   (println "\nMemory")
   (let [fmt "%04d: %25s"
         addresses (mapcat (fn [[a b]] (range a b)) ranges)]
     (dorun
-     (map #(println (format fmt % (data->str (m/get-memory mix-machine %))))
+     (map #(println (format fmt % (data->str (m/get-memory machine %))))
           addresses))
-    mix-machine))
+    machine))
 
 (defn print-data-numbered
   [data]
@@ -53,6 +53,7 @@
 
 ;; TODO - Pretty this up
 (defn print-device
-  [mix-machine d]
-  (let [device (m/get-device mix-machine d)]
-    (debug device)))
+  [machine d]
+  (let [device (m/get-device machine d)]
+    (debug device) ;; TODO - debug is not appropriate here... this is dev oriented output
+    machine))

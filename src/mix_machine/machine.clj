@@ -144,11 +144,11 @@
   (cond
     (<= 0 device-code 7) [:tape device-code]
     (<= 8 device-code 15) [:disk (- device-code 8)]
-    (= 16 device-code) :card-reader
-    (= 17 device-code) :card-punch
-    (= 18 device-code) :line-printer
-    (= 19 device-code) :typewriter
-    (= 20 device-code) :paper-tape
+    (= 16 device-code) [:card-reader]
+    (= 17 device-code) [:card-punch]
+    (= 18 device-code) [:line-printer]
+    (= 19 device-code) [:typewriter]
+    (= 20 device-code) [:paper-tape]
     :else (throw (ex-info "lookup-device: Unknown device code" {:code device-code}))))
 
 (defn get-device
@@ -164,5 +164,7 @@
   This is equivalent to (apply f device args), but returns a machine
   with the device update in-place."
   [machine device-code f & args]
+  (println "device-code" device-code)
   (let [device-loc (lookup-device device-code)]
+    (println "device-loc" device-loc)
     (apply update-in machine (cons :devices device-loc) f args)))

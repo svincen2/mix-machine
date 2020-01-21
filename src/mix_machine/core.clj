@@ -20,15 +20,22 @@
                  (d/new-data :plus [3 8 0 2 49])  ;; ENT1 200
                  (d/new-data :plus [1 36 0 2 7])  ;; MOVE 100(2)
                  (d/new-data :plus [1 36 0 1 37]) ;; OUT 100(1)
+                 (d/new-data :plus [0 0 0 0 5]) ;; NUM 0
+                 (d/new-data :plus [0 0 0 1 5]) ;; CHAR 0
+                 (d/new-data :plus [4 44 0 5 24]) ;; STA 300
+                 (d/new-data :plus [4 45 0 5 31]) ;; STX 301
+                 (d/new-data :plus [4 44 0 20 37]) ;; OUT 300(20)
                  (d/new-data :plus [0 0 0 2 5]) ;; HLT
                  ]]
     (-> @mix-machine
         (m/add-device [:tape 1] (dev/new-tape 5))
+        (m/add-device [:paper-tape] (dev/new-paper-tape 1))
         (ops/load-program program 0)
-        ops/execute-program
-        (console/print-memory [100 102] [200 202])
+        (ops/execute-program)
+        (console/print-memory [100 102] [200 202] [300 302])
         (console/print-machine)
         (console/print-device [:tape 1])
+        (console/print-device [:paper-tape])
         )
 
     ;; Don't return the entire machine (memory is too much to print...)

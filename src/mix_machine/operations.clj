@@ -1,9 +1,12 @@
 (ns mix-machine.operations
-  (:require [mix-machine.field-spec :as fs]
+  (:refer-clojure :exclude [num char])
+  (:require [clojure.math.numeric-tower :as math]
+            [clojure.string :as string]
+            [mix-machine.field-spec :as fs]
             [mix-machine.machine :as m]
             [mix-machine.data :as d]
+            [mix-machine.char :as ch]
             [mix-machine.console :as console]
-            [clojure.math.numeric-tower :as math]
             [mix-machine.device :as dev]))
 
 (def DEBUG false)
@@ -547,7 +550,7 @@
   "Writes to device identified by F the memory locations starting at M.
   Writes (:block-size device) words to the device."
   [M F machine]
-  (let [block-size (get-in (m/get-device machine F) [:device :size])
+  (let [block-size (dev/block-size (m/get-device machine F))
         block (m/get-memory machine (d/data->num M) block-size)]
     (-> machine
         (m/update-device F dev/out block))))
@@ -555,7 +558,7 @@
 (defn ioc
   [M F machine]
   (let [device (m/get-device machine F)
-        dev-type (:type device)]
+        dev-type (dev/device-type device)]
     (case dev-type
       :tape (m/update-device machine F dev/seek M)
       :disk (let [contents-X (d/data->num (m/get-register machine :X))]
@@ -578,11 +581,52 @@
 
 ;; Conversion operations -------------------------------------------------------------------------
 
-(defn mix-num
-  [M F machine])
+(defn num
+  "Convert from character code to numeric code.
+  Numeric code basically only uses the 1's position of the byte,
+  when represented as 2 decimal digits.
+  So 00, 10, 20, 30, 40, etc... are all considered 0,
+  and 01, 11, 21, 31, 41, etc... are all considered 1
+  and 03, 13, 23, 33, 43, etc... are all considered 3.
+  The contents of rA and rX are considered as 10 characters.
+  The result, considered as a decimal number, is stored in rA.
+  rX and the sign of rA are unchanged."
+  [M F machine]
+  (let [contents-A (m/get-register machine :A)
+        contents-X (m/get-register machine :X)
+        contents-AX (d/merge contents-A contents-X)
+        result (->> contents-AX
+                    (:bytes)
+                    (map (fn [b] (str (mod b 10))))
+                    (apply str)
+                    (Integer/parseInt)
+                    (d/num->data))
+        overflow (or (> (d/count-bytes result) 5)
+                     (m/get-overflow machine))]
+    (-> machine
+        (m/set-overflow overflow)
+        (m/set-register :A result))))
 
-(defn mix-char
-  [M F machine])
+(defn char
+  "Converts from numeric code to character code.
+  The content of rA is converted into a 10-byte character code in rA and rX.
+  The signs of both rA and rX are unchanged."
+  [M F machine]
+  (let [contents-A (m/get-register machine :A)
+        sign-A (:sign contents-A)
+        sign-X (:sign (m/get-register machine :X))
+        n (math/abs (d/data->num contents-A))
+        result (->> n
+                    (format "%010d")
+                    (map str)
+                    (map ch/char->code)
+                    (d/new-data sign-A))
+        [rA rX] (-> result
+                    (d/extend 10)
+                    (d/split 5))]
+    (-> machine
+        (m/set-register :A rA)
+        (m/set-register :X (d/set-sign rX sign-X)))))
 
 ;; Operation maps --------------------------------------------------------------------------------
 
@@ -759,6 +803,9 @@
    {:key :IOC :code 35 :fmod nil :fn ioc}
    {:key :JRED :code 38 :fmod nil :fn jred}
    {:key :JBUS :code 34 :fmod nil :fn jbus}
+   ;; Conversion
+   {:key :NUM :code 5 :fmod 0 :fn num}
+   {:key :CHAR :code 5 :fmod 1 :fn char}
    ;; No-op
    {:key :NOP :code 0 :fmod 0 :fn nil}
    ;; Halt

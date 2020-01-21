@@ -19,7 +19,8 @@
   (in [_])
   (out [_ data])
   (ready? [_])
-  (device-type [_]))
+  (device-type [_])
+  (block-size [_]))
 
 ;; Type is 'seekable' - as in you can move forward and backward through the type
 ;; (whatever 'move forward and backward' means for the implementing type...)
@@ -30,6 +31,9 @@
 ;; (whatever 'jump to any point' means for the implementing type...)
 (defprotocol Indexable
   (index [_ i]))
+
+
+;; Devices ---------------------------------------------------------------------------------------
 
 ;; A MIX I/O device that reads/writes complete words (sign and 5 bytes)
 (defrecord WordDevice [type dir size block ready?]
@@ -44,7 +48,13 @@
       (assert (= size (count b)) (count b))
       (assoc _ :block (vec b))))
   (ready? [_] ready?)
-  (device-type [_] type))
+  (device-type [_] type)
+  (block-size [_] size))
+
+;; Add debugging
+(extend WordDevice
+  Debuggable
+  DefaultDebuggable)
 
 ;; A MIX I/O device that reads/writes MIX characters
 ;; CharDevices can also accept input from strings and stdin.
@@ -65,6 +75,7 @@
       (assoc _ :block (vec (map d/data->chars b)))))
   (ready? [_] ready?)
   (device-type [_] type)
+  (block-size [_] size)
   UserInput
   (read-console [_]
     (read-str _ (read-line)))
@@ -75,12 +86,6 @@
           rem (- (* size 5) chs-read)
           input (partition 5 (concat chs (repeat rem " ")))]
       (assoc _ :block (mapv vec input)))))
-
-;; Add debugging
-
-(extend WordDevice
-  Debuggable
-  DefaultDebuggable)
 
 (extend CharDevice
   Debuggable
@@ -107,8 +112,6 @@
       (> n 0) (let [i (min (dec (count blocks)) (+ index n))
                     old-block (:block device)
                     new-block (get blocks n)]
-                (println "i" i)
-                (debug device)
                 (-> _
                     (assoc-in [:device :block] (or new-block (make-block)))
                     (assoc-in [:blocks index] old-block)
@@ -121,7 +124,12 @@
         (update :device out b)
         (seek 1)))
   (ready? [_] (ready? device))
-  (device-type [_] (device-type device)))
+  (device-type [_] (device-type device))
+  (block-size [_] (block-size device)))
+
+(extend SeekableDevice
+  Debuggable
+  DefaultDebuggable)
 
 ;; A MIX I/O device that can be indexed (drum / disk)
 (defrecord IndexableDevice [device size index make-block blocks]
@@ -140,11 +148,8 @@
   (out [_ b]
     (update _ :device out b))
   (ready? [_] (ready? device))
-  (device-type [_] (device-type device)))
-
-(extend SeekableDevice
-  Debuggable
-  DefaultDebuggable)
+  (device-type [_] (device-type device))
+  (block-size [_] (block-size device)))
 
 (extend IndexableDevice
   Debuggable
@@ -166,7 +171,7 @@
           {}
           maps))
 
-(def block-size (extract-property devices :type :block-size))
+(def device-block-size (extract-property devices :type :block-size))
 (def device-dir (extract-property devices :type :dir))
 (def device-mode (extract-property devices :type :mode))
 
@@ -192,7 +197,7 @@
   (assert (valid-device-type? device-type))
   (let [mode (device-mode device-type)
         dir (device-dir device-type)
-        size (block-size device-type)
+        size (device-block-size device-type)
         block (make-block mode size)]
     (case mode
       :word (->WordDevice device-type dir size block true)
@@ -218,5 +223,5 @@
 (def new-card-punch (make-device :card-punch))
 (def new-line-printer (make-device :line-printer))
 (def new-typewriter (make-device :typewriter))
-(defn new-paper-tape [size] (make-seekable-device :paper-tape))
+(defn new-paper-tape [size] (make-seekable-device :paper-tape size))
 
