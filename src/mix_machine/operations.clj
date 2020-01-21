@@ -552,6 +552,38 @@
     (-> machine
         (m/update-device F dev/out block))))
 
+(defn ioc
+  [M F machine]
+  (let [device (m/get-device machine F)
+        dev-type (:type device)]
+    (case dev-type
+      :tape (m/update-device machine F dev/seek M)
+      :disk (let [contents-X (d/data->num (m/get-register machine :X))]
+              (m/update-device machine F dev/index contents-X))
+      :line-printer machine ;; TODO Skip to following page
+      :paper-tape (m/update-device machine F dev/seek 0))))
+
+(defn- jr*
+  "Jump based on the ready? property of the device identified by F.
+  If (= ready? r), jump occurs."
+  [r M F machine]
+  (let [device (m/get-device machine F)
+        ready (dev/ready? device)]
+    (if (= ready r)
+      (jmp M F machine))))
+
+(def jred (partial jr* true))
+(def jbus (partial jr* false))
+
+
+;; Conversion operations -------------------------------------------------------------------------
+
+(defn mix-num
+  [M F machine])
+
+(defn mix-char
+  [M F machine])
+
 ;; Operation maps --------------------------------------------------------------------------------
 
 ;; All operations
@@ -724,7 +756,9 @@
    ;; I/O
    {:key :IN :code 36 :fmod nil :fn in}
    {:key :OUT :code 37 :fmod nil :fn out}
-   ;; {:key :IOC :code :fmod nil :fn ioc}
+   {:key :IOC :code 35 :fmod nil :fn ioc}
+   {:key :JRED :code 38 :fmod nil :fn jred}
+   {:key :JBUS :code 34 :fmod nil :fn jbus}
    ;; No-op
    {:key :NOP :code 0 :fmod 0 :fn nil}
    ;; Halt

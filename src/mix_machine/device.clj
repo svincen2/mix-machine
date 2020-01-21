@@ -17,7 +17,9 @@
 ;; Type is a MIX I/O device
 (defprotocol IODevice
   (in [_])
-  (out [_ data]))
+  (out [_ data])
+  (ready? [_])
+  (device-type [_]))
 
 ;; Type is 'seekable' - as in you can move forward and backward through the type
 ;; (whatever 'move forward and backward' means for the implementing type...)
@@ -40,7 +42,9 @@
     (when (not= :in dir)
       ;; NOTE - For now, we'll just read the whole block
       (assert (= size (count b)) (count b))
-      (assoc _ :block (vec b)))))
+      (assoc _ :block (vec b))))
+  (ready? [_] ready?)
+  (device-type [_] type))
 
 ;; A MIX I/O device that reads/writes MIX characters
 ;; CharDevices can also accept input from strings and stdin.
@@ -59,6 +63,8 @@
       ;; NOTE - For now, we'll just read the whole block
       (assert (= size (count b)))
       (assoc _ :block (vec (map d/data->chars b)))))
+  (ready? [_] ready?)
+  (device-type [_] type)
   UserInput
   (read-console [_]
     (read-str _ (read-line)))
@@ -113,7 +119,9 @@
   (out [_ b]
     (-> _
         (update :device out b)
-        (seek 1))))
+        (seek 1)))
+  (ready? [_] (ready? device))
+  (device-type [_] (device-type device)))
 
 ;; A MIX I/O device that can be indexed (drum / disk)
 (defrecord IndexableDevice [device size index make-block blocks]
@@ -130,7 +138,9 @@
   (in [_]
     (in device))
   (out [_ b]
-    (update _ :device out b)))
+    (update _ :device out b))
+  (ready? [_] (ready? device))
+  (device-type [_] (device-type device)))
 
 (extend SeekableDevice
   Debuggable
@@ -208,5 +218,5 @@
 (def new-card-punch (make-device :card-punch))
 (def new-line-printer (make-device :line-printer))
 (def new-typewriter (make-device :typewriter))
-(def new-paper-tape (make-device :paper-tape))
+(defn new-paper-tape [size] (make-seekable-device :paper-tape))
 

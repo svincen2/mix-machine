@@ -51,6 +51,7 @@
   (dorun
    (map-indexed (fn [i d] (println (format "%04d: %25s" i (data->str d)))) data)))
 
+;; TODO - Pretty this up
 (defn print-device
   [mix-machine d]
   (let [device (m/get-device mix-machine d)]
