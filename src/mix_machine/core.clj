@@ -37,6 +37,5 @@
         (console/print-device [:tape 1])
         (console/print-device [:paper-tape])
         )
-
     ;; Don't return the entire machine (memory is too much to print...)
     nil))

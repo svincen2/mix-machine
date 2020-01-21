@@ -24,9 +24,6 @@
    :overflow false
    :condition-indicator :equal
    :memory (vec (repeat 4000 (d/new-data 5)))
-   ;; NOTE - For now, we'll just assume the program is loaded into memory 0,
-   ;; in order (i.e. memory 0 contains first instruction, memory 1 contains the second, etc...)
-   :program-counter 0
    ;; NOTE - You'll need to add the devices you want with add-device
    :devices {:tape (vec (repeat 8 nil))
              :disk (vec (repeat 8 nil))
@@ -35,6 +32,10 @@
              :line-printer nil
              :typewriter nil
              :paper-tape nil}
+   ;; NOTE - NOT DEFINED BY MIX
+   ;; For now, we'll just assume the program is loaded into memory 0,
+   ;; in order (i.e. memory 0 contains first instruction, memory 1 contains the second, etc...)
+   :program-counter 0
    })
 
 (def valid-condition-indicator? #{:less :equal :greater})
@@ -164,7 +165,5 @@
   This is equivalent to (apply f device args), but returns a machine
   with the device update in-place."
   [machine device-code f & args]
-  (println "device-code" device-code)
   (let [device-loc (lookup-device device-code)]
-    (println "device-loc" device-loc)
     (apply update-in machine (cons :devices device-loc) f args)))

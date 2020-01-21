@@ -644,172 +644,172 @@
 (def ^:private operations
   [
    ;; Load
-   {:key :LDA :code 8 :fmod 5 :fn lda}
-   {:key :LDX :code 15 :fmod 5 :fn ldx}
-   {:key :LD1 :code 9 :fmod 5 :fn ld1}
-   {:key :LD2 :code 10 :fmod 5 :fn ld2}
-   {:key :LD3 :code 11 :fmod 5 :fn ld3}
-   {:key :LD4 :code 12 :fmod 5 :fn ld4}
-   {:key :LD5 :code 13 :fmod 5 :fn ld5}
-   {:key :LD6 :code 14 :fmod 5 :fn ld6}
-   {:key :LDAN :code 16 :fmod 5 :fn ldan}
-   {:key :LDXN :code 23 :fmod 5 :fn ldxn}
-   {:key :LD1N :code 17 :fmod 5 :fn ld1n}
-   {:key :LD2N :code 18 :fmod 5 :fn ld2n}
-   {:key :LD3N :code 19 :fmod 5 :fn ld3n}
-   {:key :LD4N :code 20 :fmod 5 :fn ld4n}
-   {:key :LD5N :code 21 :fmod 5 :fn ld5n}
-   {:key :LD6N :code 22 :fmod 5 :fn ld6n}
+   {:key :LDA :code 8 :fmod 5 :fn lda :t 2}
+   {:key :LDX :code 15 :fmod 5 :fn ldx :t 2}
+   {:key :LD1 :code 9 :fmod 5 :fn ld1 :t 2}
+   {:key :LD2 :code 10 :fmod 5 :fn ld2 :t 2}
+   {:key :LD3 :code 11 :fmod 5 :fn ld3 :t 2}
+   {:key :LD4 :code 12 :fmod 5 :fn ld4 :t 2}
+   {:key :LD5 :code 13 :fmod 5 :fn ld5 :t 2}
+   {:key :LD6 :code 14 :fmod 5 :fn ld6 :t 2}
+   {:key :LDAN :code 16 :fmod 5 :fn ldan :t 2}
+   {:key :LDXN :code 23 :fmod 5 :fn ldxn :t 2}
+   {:key :LD1N :code 17 :fmod 5 :fn ld1n :t 2}
+   {:key :LD2N :code 18 :fmod 5 :fn ld2n :t 2}
+   {:key :LD3N :code 19 :fmod 5 :fn ld3n :t 2}
+   {:key :LD4N :code 20 :fmod 5 :fn ld4n :t 2}
+   {:key :LD5N :code 21 :fmod 5 :fn ld5n :t 2}
+   {:key :LD6N :code 22 :fmod 5 :fn ld6n :t 2}
    ;; Store
-   {:key :STA :code 24 :fmod 5 :fn sta}
-   {:key :STX :code 31 :fmod 5 :fn stx}
-   {:key :ST1 :code 25 :fmod 5 :fn st1}
-   {:key :ST2 :code 26 :fmod 5 :fn st2}
-   {:key :ST3 :code 27 :fmod 5 :fn st3}
-   {:key :ST4 :code 28 :fmod 5 :fn st4}
-   {:key :ST5 :code 29 :fmod 5 :fn st5}
-   {:key :ST6 :code 30 :fmod 5 :fn st6}
-   {:key :STJ :code 32 :fmod 2 :fn stj}
-   {:key :STZ :code 33 :fmod 5 :fn stz}
-   ;; Arithmetic
-   {:key :ADD :code 1 :fmod 5 :fn add}
-   {:key :SUB :code 2 :fmod 5 :fn sub}
-   {:key :MUL :code 3 :fmod 5 :fn mul}
-   {:key :DIV :code 4 :fmod 5 :fn div}
+   {:key :STA :code 24 :fmod 5 :fn sta :t 2}
+   {:key :STX :code 31 :fmod 5 :fn stx :t 2}
+   {:key :ST1 :code 25 :fmod 5 :fn st1 :t 2}
+   {:key :ST2 :code 26 :fmod 5 :fn st2 :t 2}
+   {:key :ST3 :code 27 :fmod 5 :fn st3 :t 2}
+   {:key :ST4 :code 28 :fmod 5 :fn st4 :t 2}
+   {:key :ST5 :code 29 :fmod 5 :fn st5 :t 2}
+   {:key :ST6 :code 30 :fmod 5 :fn st6 :t 2}
+   {:key :STJ :code 32 :fmod 2 :fn stj :t 2}
+   {:key :STZ :code 33 :fmod 5 :fn stz :t 2}
+   ;; Arithmeti2
+   {:key :ADD :code 1 :fmod 5 :fn add :t 2}
+   {:key :SUB :code 2 :fmod 5 :fn sub :t 2}
+   {:key :MUL :code 3 :fmod 5 :fn mul :t 10}
+   {:key :DIV :code 4 :fmod 5 :fn div :t 12}
    ;; Address transfer
    ;; NOTE - These require lookup by code and fmod
-   {:key :ENTA :code 48 :fmod 2 :fn enta}
-   {:key :ENTX :code 55 :fmod 2 :fn entx}
-   {:key :ENT1 :code 49 :fmod 2 :fn ent1}
-   {:key :ENT2 :code 50 :fmod 2 :fn ent2}
-   {:key :ENT3 :code 51 :fmod 2 :fn ent3}
-   {:key :ENT4 :code 52 :fmod 2 :fn ent4}
-   {:key :ENT5 :code 53 :fmod 2 :fn ent5}
-   {:key :ENT6 :code 54 :fmod 2 :fn ent6}
-   {:key :ENNA :code 48 :fmod 3 :fn enna}
-   {:key :ENNX :code 55 :fmod 3 :fn ennx}
-   {:key :ENN1 :code 49 :fmod 3 :fn enn1}
-   {:key :ENN2 :code 50 :fmod 3 :fn enn2}
-   {:key :ENN3 :code 51 :fmod 3 :fn enn3}
-   {:key :ENN4 :code 52 :fmod 3 :fn enn4}
-   {:key :ENN5 :code 53 :fmod 3 :fn enn5}
-   {:key :ENN6 :code 54 :fmod 3 :fn enn6}
-   {:key :INCA :code 48 :fmod 0 :fn inca}
-   {:key :INCX :code 55 :fmod 0 :fn incx}
-   {:key :INC1 :code 49 :fmod 0 :fn inc1}
-   {:key :INC2 :code 50 :fmod 0 :fn inc2}
-   {:key :INC3 :code 51 :fmod 0 :fn inc3}
-   {:key :INC4 :code 52 :fmod 0 :fn inc4}
-   {:key :INC5 :code 53 :fmod 0 :fn inc5}
-   {:key :INC6 :code 54 :fmod 0 :fn inc6}
-   {:key :DECA :code 48 :fmod 1 :fn deca}
-   {:key :DECX :code 55 :fmod 1 :fn decx}
-   {:key :DEC1 :code 49 :fmod 1 :fn dec1}
-   {:key :DEC2 :code 50 :fmod 1 :fn dec2}
-   {:key :DEC3 :code 51 :fmod 1 :fn dec3}
-   {:key :DEC4 :code 52 :fmod 1 :fn dec4}
-   {:key :DEC5 :code 53 :fmod 1 :fn dec5}
-   {:key :DEC6 :code 54 :fmod 1 :fn dec6}
+   {:key :ENTA :code 48 :fmod 2 :fn enta :t 1}
+   {:key :ENTX :code 55 :fmod 2 :fn entx :t 1}
+   {:key :ENT1 :code 49 :fmod 2 :fn ent1 :t 1}
+   {:key :ENT2 :code 50 :fmod 2 :fn ent2 :t 1}
+   {:key :ENT3 :code 51 :fmod 2 :fn ent3 :t 1}
+   {:key :ENT4 :code 52 :fmod 2 :fn ent4 :t 1}
+   {:key :ENT5 :code 53 :fmod 2 :fn ent5 :t 1}
+   {:key :ENT6 :code 54 :fmod 2 :fn ent6 :t 1}
+   {:key :ENNA :code 48 :fmod 3 :fn enna :t 1}
+   {:key :ENNX :code 55 :fmod 3 :fn ennx :t 1}
+   {:key :ENN1 :code 49 :fmod 3 :fn enn1 :t 1}
+   {:key :ENN2 :code 50 :fmod 3 :fn enn2 :t 1}
+   {:key :ENN3 :code 51 :fmod 3 :fn enn3 :t 1}
+   {:key :ENN4 :code 52 :fmod 3 :fn enn4 :t 1}
+   {:key :ENN5 :code 53 :fmod 3 :fn enn5 :t 1}
+   {:key :ENN6 :code 54 :fmod 3 :fn enn6 :t 1}
+   {:key :INCA :code 48 :fmod 0 :fn inca :t 1}
+   {:key :INCX :code 55 :fmod 0 :fn incx :t 1}
+   {:key :INC1 :code 49 :fmod 0 :fn inc1 :t 1}
+   {:key :INC2 :code 50 :fmod 0 :fn inc2 :t 1}
+   {:key :INC3 :code 51 :fmod 0 :fn inc3 :t 1}
+   {:key :INC4 :code 52 :fmod 0 :fn inc4 :t 1}
+   {:key :INC5 :code 53 :fmod 0 :fn inc5 :t 1}
+   {:key :INC6 :code 54 :fmod 0 :fn inc6 :t 1}
+   {:key :DECA :code 48 :fmod 1 :fn deca :t 1}
+   {:key :DECX :code 55 :fmod 1 :fn decx :t 1}
+   {:key :DEC1 :code 49 :fmod 1 :fn dec1 :t 1}
+   {:key :DEC2 :code 50 :fmod 1 :fn dec2 :t 1}
+   {:key :DEC3 :code 51 :fmod 1 :fn dec3 :t 1}
+   {:key :DEC4 :code 52 :fmod 1 :fn dec4 :t 1}
+   {:key :DEC5 :code 53 :fmod 1 :fn dec5 :t 1}
+   {:key :DEC6 :code 54 :fmod 1 :fn dec6 :t 1}
    ;; Comparison
-   {:key :CMPA :code 56 :fmod 5 :fn cmpa}
-   {:key :CMPX :code 63 :fmod 5 :fn cmpx}
-   {:key :CMP1 :code 57 :fmod 5 :fn cmp1}
-   {:key :CMP2 :code 58 :fmod 5 :fn cmp2}
-   {:key :CMP3 :code 59 :fmod 5 :fn cmp3}
-   {:key :CMP4 :code 60 :fmod 5 :fn cmp4}
-   {:key :CMP5 :code 61 :fmod 5 :fn cmp5}
-   {:key :CMP6 :code 62 :fmod 5 :fn cmp6}
+   {:key :CMPA :code 56 :fmod 5 :fn cmpa :t 2}
+   {:key :CMPX :code 63 :fmod 5 :fn cmpx :t 2}
+   {:key :CMP1 :code 57 :fmod 5 :fn cmp1 :t 2}
+   {:key :CMP2 :code 58 :fmod 5 :fn cmp2 :t 2}
+   {:key :CMP3 :code 59 :fmod 5 :fn cmp3 :t 2}
+   {:key :CMP4 :code 60 :fmod 5 :fn cmp4 :t 2}
+   {:key :CMP5 :code 61 :fmod 5 :fn cmp5 :t 2}
+   {:key :CMP6 :code 62 :fmod 5 :fn cmp6 :t 2}
    ;; Jump
-   {:key :JMP :code 39 :fmod 0 :fn jmp}
-   {:key :JSJ :code 39 :fmod 1 :fn jsj}
+   {:key :JMP :code 39 :fmod 0 :fn jmp :t 1}
+   {:key :JSJ :code 39 :fmod 1 :fn jsj :t 1}
    ;; Jump overflow
-   {:key :JOV :code 39 :fmod 2 :fn jov}
-   {:key :JNOV :code 39 :fmod 3 :fn jnov}
+   {:key :JOV :code 39 :fmod 2 :fn jov :t 1}
+   {:key :JNOV :code 39 :fmod 3 :fn jnov :t 1}
    ;; Jump condition indicator
-   {:key :JL :code 39 :fmod 4 :fn jl}
-   {:key :JE :code 39 :fmod 5 :fn je}
-   {:key :JG :code 39 :fmod 6 :fn jg}
-   {:key :JGE :code 39 :fmod 7 :fn jge}
-   {:key :JNE :code 39 :fmod 8 :fn jne}
-   {:key :JLE :code 39 :fmod 9 :fn jle}
+   {:key :JL :code 39 :fmod 4 :fn jl :t 1}
+   {:key :JE :code 39 :fmod 5 :fn je :t 1}
+   {:key :JG :code 39 :fmod 6 :fn jg :t 1}
+   {:key :JGE :code 39 :fmod 7 :fn jge :t 1}
+   {:key :JNE :code 39 :fmod 8 :fn jne :t 1}
+   {:key :JLE :code 39 :fmod 9 :fn jle :t 1}
    ;; Jump Accumulator
-   {:key :JAN :code 40 :fmod 0 :fn jan}
-   {:key :JAZ :code 40 :fmod 1 :fn jaz}
-   {:key :JAP :code 40 :fmod 2 :fn jap}
-   {:key :JANN :code 40 :fmod 3 :fn jann}
-   {:key :JANZ :code 40 :fmod 4 :fn janz}
-   {:key :JANP :code 40 :fmod 5 :fn janp}
+   {:key :JAN :code 40 :fmod 0 :fn jan :t 1}
+   {:key :JAZ :code 40 :fmod 1 :fn jaz :t 1}
+   {:key :JAP :code 40 :fmod 2 :fn jap :t 1}
+   {:key :JANN :code 40 :fmod 3 :fn jann :t 1}
+   {:key :JANZ :code 40 :fmod 4 :fn janz :t 1}
+   {:key :JANP :code 40 :fmod 5 :fn janp :t 1}
    ;; Jump Extension
-   {:key :JXN :code 47 :fmod 0 :fn jxn}
-   {:key :JXZ :code 47 :fmod 1 :fn jxz}
-   {:key :JXP :code 47 :fmod 2 :fn jxp}
-   {:key :JXNN :code 47 :fmod 3 :fn jxnn}
-   {:key :JXNZ :code 47 :fmod 4 :fn jxnz}
-   {:key :JXNP :code 47 :fmod 5 :fn jxnp}
+   {:key :JXN :code 47 :fmod 0 :fn jxn :t 1}
+   {:key :JXZ :code 47 :fmod 1 :fn jxz :t 1}
+   {:key :JXP :code 47 :fmod 2 :fn jxp :t 1}
+   {:key :JXNN :code 47 :fmod 3 :fn jxnn :t 1}
+   {:key :JXNZ :code 47 :fmod 4 :fn jxnz :t 1}
+   {:key :JXNP :code 47 :fmod 5 :fn jxnp :t 1}
    ;; Jump I1
-   {:key :J1N  :code 41 :fmod 0 :fn j1n}
-   {:key :J1Z  :code 41 :fmod 1 :fn j1z}
-   {:key :J1P  :code 41 :fmod 2 :fn j1p}
-   {:key :J1NN :code 41 :fmod 3 :fn j1nn}
-   {:key :J1NZ :code 41 :fmod 4 :fn j1nz}
-   {:key :J1NP :code 41 :fmod 5 :fn j1np}
+   {:key :J1N  :code 41 :fmod 0 :fn j1n :t 1}
+   {:key :J1Z  :code 41 :fmod 1 :fn j1z :t 1}
+   {:key :J1P  :code 41 :fmod 2 :fn j1p :t 1}
+   {:key :J1NN :code 41 :fmod 3 :fn j1nn :t 1}
+   {:key :J1NZ :code 41 :fmod 4 :fn j1nz :t 1}
+   {:key :J1NP :code 41 :fmod 5 :fn j1np :t 1}
    ;; Jump I2
-   {:key :J2N  :code 42 :fmod 0 :fn j2n}
-   {:key :J2Z  :code 42 :fmod 1 :fn j2z}
-   {:key :J2P  :code 42 :fmod 2 :fn j2p}
-   {:key :J2NN :code 42 :fmod 3 :fn j2nn}
-   {:key :J2NZ :code 42 :fmod 4 :fn j2nz}
-   {:key :J2NP :code 42 :fmod 5 :fn j2np}
+   {:key :J2N  :code 42 :fmod 0 :fn j2n :t 1}
+   {:key :J2Z  :code 42 :fmod 1 :fn j2z :t 1}
+   {:key :J2P  :code 42 :fmod 2 :fn j2p :t 1}
+   {:key :J2NN :code 42 :fmod 3 :fn j2nn :t 1}
+   {:key :J2NZ :code 42 :fmod 4 :fn j2nz :t 1}
+   {:key :J2NP :code 42 :fmod 5 :fn j2np :t 1}
    ;; Jump I3
-   {:key :J3N  :code 43 :fmod 0 :fn j3n}
-   {:key :J3Z  :code 43 :fmod 1 :fn j3z}
-   {:key :J3P  :code 43 :fmod 2 :fn j3p}
-   {:key :J3NN :code 43 :fmod 3 :fn j3nn}
-   {:key :J3NZ :code 43 :fmod 4 :fn j3nz}
-   {:key :J3NP :code 43 :fmod 5 :fn j3np}
+   {:key :J3N  :code 43 :fmod 0 :fn j3n :t 1}
+   {:key :J3Z  :code 43 :fmod 1 :fn j3z :t 1}
+   {:key :J3P  :code 43 :fmod 2 :fn j3p :t 1}
+   {:key :J3NN :code 43 :fmod 3 :fn j3nn :t 1}
+   {:key :J3NZ :code 43 :fmod 4 :fn j3nz :t 1}
+   {:key :J3NP :code 43 :fmod 5 :fn j3np :t 1}
    ;; Jump I4
-   {:key :J4N  :code 44 :fmod 0 :fn j4n}
-   {:key :J4Z  :code 44 :fmod 1 :fn j4z}
-   {:key :J4P  :code 44 :fmod 2 :fn j4p}
-   {:key :J4NN :code 44 :fmod 3 :fn j4nn}
-   {:key :J4NZ :code 44 :fmod 4 :fn j4nz}
-   {:key :J4NP :code 44 :fmod 5 :fn j4np}
+   {:key :J4N  :code 44 :fmod 0 :fn j4n :t 1}
+   {:key :J4Z  :code 44 :fmod 1 :fn j4z :t 1}
+   {:key :J4P  :code 44 :fmod 2 :fn j4p :t 1}
+   {:key :J4NN :code 44 :fmod 3 :fn j4nn :t 1}
+   {:key :J4NZ :code 44 :fmod 4 :fn j4nz :t 1}
+   {:key :J4NP :code 44 :fmod 5 :fn j4np :t 1}
    ;; Jump I5
-   {:key :J5N  :code 45 :fmod 0 :fn j5n}
-   {:key :J5Z  :code 45 :fmod 1 :fn j5z}
-   {:key :J5P  :code 45 :fmod 2 :fn j5p}
-   {:key :J5NN :code 45 :fmod 3 :fn j5nn}
-   {:key :J5NZ :code 45 :fmod 4 :fn j5nz}
-   {:key :J5NP :code 45 :fmod 5 :fn j5np}
+   {:key :J5N  :code 45 :fmod 0 :fn j5n :t 1}
+   {:key :J5Z  :code 45 :fmod 1 :fn j5z :t 1}
+   {:key :J5P  :code 45 :fmod 2 :fn j5p :t 1}
+   {:key :J5NN :code 45 :fmod 3 :fn j5nn :t 1}
+   {:key :J5NZ :code 45 :fmod 4 :fn j5nz :t 1}
+   {:key :J5NP :code 45 :fmod 5 :fn j5np :t 1}
    ;; Jump I6
-   {:key :J6N  :code 46 :fmod 0 :fn j6n}
-   {:key :J6Z  :code 46 :fmod 1 :fn j6z}
-   {:key :J6P  :code 46 :fmod 2 :fn j6p}
-   {:key :J6NN :code 46 :fmod 3 :fn j6nn}
-   {:key :J6NZ :code 46 :fmod 4 :fn j6nz}
-   {:key :J6NP :code 46 :fmod 5 :fn j6np}
+   {:key :J6N  :code 46 :fmod 0 :fn j6n :t 1}
+   {:key :J6Z  :code 46 :fmod 1 :fn j6z :t 1}
+   {:key :J6P  :code 46 :fmod 2 :fn j6p :t 1}
+   {:key :J6NN :code 46 :fmod 3 :fn j6nn :t 1}
+   {:key :J6NZ :code 46 :fmod 4 :fn j6nz :t 1}
+   {:key :J6NP :code 46 :fmod 5 :fn j6np :t 1}
    ;; Shift
-   {:key :SLA :code 6 :fmod 0 :fn sla}
-   {:key :SRA :code 6 :fmod 1 :fn sra}
-   {:key :SLAX :code 6 :fmod 2 :fn slax}
-   {:key :SRAX :code 6 :fmod 3 :fn srax}
-   {:key :SLC :code 6 :fmod 4 :fn slc}
-   {:key :SRC :code 6 :fmod 5 :fn src}
+   {:key :SLA :code 6 :fmod 0 :fn sla :t 2}
+   {:key :SRA :code 6 :fmod 1 :fn sra :t 2}
+   {:key :SLAX :code 6 :fmod 2 :fn slax :t 2}
+   {:key :SRAX :code 6 :fmod 3 :fn srax :t 2}
+   {:key :SLC :code 6 :fmod 4 :fn slc :t 2}
+   {:key :SRC :code 6 :fmod 5 :fn src :t 2}
    ;; Move
-   {:key :MOVE :code 7 :fmod 1 :fn move}
+   {:key :MOVE :code 7 :fmod 1 :fn move :t [1 2]}
    ;; I/O
-   {:key :IN :code 36 :fmod nil :fn in}
-   {:key :OUT :code 37 :fmod nil :fn out}
-   {:key :IOC :code 35 :fmod nil :fn ioc}
-   {:key :JRED :code 38 :fmod nil :fn jred}
-   {:key :JBUS :code 34 :fmod nil :fn jbus}
+   {:key :IN :code 36 :fmod nil :fn in :t 1}
+   {:key :OUT :code 37 :fmod nil :fn out :t 1}
+   {:key :IOC :code 35 :fmod nil :fn ioc :t 1}
+   {:key :JRED :code 38 :fmod nil :fn jred :t 1}
+   {:key :JBUS :code 34 :fmod nil :fn jbus :t 1}
    ;; Conversion
-   {:key :NUM :code 5 :fmod 0 :fn num}
-   {:key :CHAR :code 5 :fmod 1 :fn char}
+   {:key :NUM :code 5 :fmod 0 :fn num :t 10}
+   {:key :CHAR :code 5 :fmod 1 :fn char :t 10}
    ;; No-op
-   {:key :NOP :code 0 :fmod 0 :fn nil}
+   {:key :NOP :code 0 :fmod 0 :fn nil :t 1}
    ;; Halt
-   {:key :HLT :code 5 :fmod 2 :fn nil}
+   {:key :HLT :code 5 :fmod 2 :fn nil :t 1}
    ])
 
 (def ^:private operations-by-code (group-by :code operations))
@@ -872,17 +872,31 @@
      :F fmod
      :op (lookup-op code fmod)}))
 
+(defn- execution-time
+  "Returns the execution time for the decoded instruction.
+  Timing for all instructions is static, except for MOVE.
+  MOVE instructions must take into account to time it takes
+  to copy each memory element.
+  NOTE - IN, OUT, and IOC do not include time waiting for device."
+  [machine M F op]
+  (let [{:keys [key t]} op]
+    (case key
+      :MOVE (+ (first t) (* (second t) F))
+      t)))
+
 (defn execute-next-instruction
   [machine]
   (let [pc (m/get-program-counter machine)
         inst (m/get-memory machine pc)
         {:keys [M F op]} (decode-instruction machine inst)
+        time (execution-time machine M F op)
         {op-fn :fn key :key} op]
     (when PRINT
       (println "\nExecute Operation")
       (println (format "-- %-7s %20s" "Name" (name key)))
       (println (format "-- %-7s %20d" "M" (d/data->num M)))
       (println (format "-- %-7s %20s" "F" F (fs/field-spec-str F)))
+      (println (format "-- %-7s %20d" "Time" time))
       )
     (-> (case key
           :HLT [machine true]
