@@ -3,7 +3,13 @@
             [mix-machine.debug :refer [Debuggable debug DefaultDebuggable]]
             [mix-machine.char :as ch]))
 
-;; TODO - ready? isn't used at all
+;; TODO
+;; ready? isn't used at all
+;; Some of the devices probably don't work the way they should.
+;;   Line printer, for example, has an IOC operation that skips it forward
+;;   to the top of the next page.  I'm not sure what to do there.
+;;   Also, Paper Tape has an IOC to rewind, but not to seek the same way a Tape does.
+;;   For now, Paper Tape is a SeekableDevice, but only rewinds are allowed.
 
 
 ;; Type accepts input from the user
@@ -43,10 +49,12 @@
     (when (not= :out dir)
       block))
   (out [_ b]
-    (when (not= :in dir)
-      ;; NOTE - For now, we'll just read the whole block
-      (assert (= size (count b)) (count b))
-      (assoc _ :block (vec b))))
+    (if (not= :in dir)
+      (do
+        ;; NOTE - For now, we'll just read the whole block
+        (assert (= size (count b)) (count b))
+        (assoc _ :block (vec b)))
+      _))
   (ready? [_] ready?)
   (device-type [_] type)
   (block-size [_] size))
@@ -69,10 +77,12 @@
       ;; Convert to words, with a plus sign.
       (vec (map d/chars->data block))))
   (out [_ b]
-    (when (not= :in dir)
-      ;; NOTE - For now, we'll just read the whole block
-      (assert (= size (count b)))
-      (assoc _ :block (vec (map d/data->chars b)))))
+    (if (not= :in dir)
+      (do
+        ;; NOTE - For now, we'll just read the whole block
+        (assert (= size (count b)))
+        (assoc _ :block (vec (map d/data->chars b))))
+      _))
   (ready? [_] ready?)
   (device-type [_] type)
   (block-size [_] size)
