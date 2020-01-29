@@ -14,7 +14,9 @@
 ;; Byte: 0-63
 ;; Sign: + or -
 ;; Word: Sign, 5 bytes
-(def non-neg-int? (complement neg-int?))
+(defn non-neg-int?
+  [x]
+  (and (int? x) (not (neg? x))))
 
 (def byte-size 64)
 
@@ -22,7 +24,7 @@
 (s/def ::byte (s/and int? #(< -1 % byte-size)))
 (s/def ::bytes (s/coll-of ::byte :into []))
 (s/def ::data (s/keys :req [::sign ::bytes]))
-(s/def ::int-or-bytes (s/or :i int? :bs ::bytes))
+(s/def ::int-or-bytes (s/or :i non-neg-int? :bs ::bytes))
 
 (defn sign
   [data]
@@ -45,17 +47,22 @@
   ([num-or-bytes]
    (new-data :plus num-or-bytes))
   ([sign num-or-bytes]
-   {:pre [(s/valid? ::sign sign)]
+   {
+    ;; :pre [(s/valid? ::sign sign)]
     :post [(s/valid? ::data %)]}
-   ;; NOTE - Validation num-or-bytes this way to provide more detail in error cases.
-   (let [bytes-arg (s/conform ::int-or-bytes num-or-bytes)]
+   ;; NOTE - Validating this way to provide more detailed errors.
+   (let [sign-arg (s/conform ::sign sign)
+         bytes-arg (s/conform ::int-or-bytes num-or-bytes)]
+     (when (s/invalid? sign-arg)
+       (throw (ex-info "Invalid sign argument"
+                       (s/explain-data ::sign sign))))
      (when (s/invalid? bytes-arg)
-       (throw (ex-info "Invalid argument"
+       (throw (ex-info "Invalid bytes argument"
                        (s/explain-data ::int-or-bytes num-or-bytes))))
      (let [[k v] bytes-arg]
        (case k
-         :i {::sign sign ::bytes (vec (repeat v 0))}
-         :bs {::sign sign ::bytes v})))))
+         :i {::sign sign-arg ::bytes (vec (repeat v 0))}
+         :bs {::sign sign-arg ::bytes v})))))
 
 (defn count-bytes
   "Return the number of bytes of the data"
@@ -146,12 +153,12 @@
   as are needed to represent num.
   In the second form, the data returned can be extended to a certain size,
   however size cannot be used to truncate.  If you need to do that,
-  pass the result of this function into a call to truncate. "
+  pass the result of this function into a call to truncate."
   ([num]
    (num->data num nil))
   ([num size]
    {:pre [(s/valid? int? num)
-          (s/valid? non-neg-int? size)]
+          (s/valid? (s/nilable non-neg-int?) size)]
     :post [(s/valid? ::data %)]}
    (let [sign (if (< num 0) :minus :plus)
          bytes (loop [bytes (list) n (math/abs num)]
