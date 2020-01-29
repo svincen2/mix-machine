@@ -91,10 +91,10 @@
     (read-str _ (read-line)))
   StringInput
   (read-str [_ s]
-    (let [chs (map str (seq s))
+    (let [chs (seq s)
           chs-read (count chs)
           rem (- (* size 5) chs-read)
-          input (partition 5 (concat chs (repeat rem " ")))]
+          input (partition 5 (concat chs (repeat rem \space)))]
       (assoc _ :block (mapv vec input)))))
 
 (extend CharDevice

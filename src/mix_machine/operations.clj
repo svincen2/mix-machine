@@ -618,8 +618,7 @@
         n (math/abs (d/data->num contents-A))
         result (->> n
                     (format "%010d")
-                    (map str)
-                    (map ch/char->code)
+                    (ch/str->code)
                     (d/new-data sign-A))
         [rA rX] (-> result
                     (d/extend 10)
