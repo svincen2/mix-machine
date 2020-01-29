@@ -1,7 +1,9 @@
 (ns mix-machine.data
   (:refer-clojure :rename {merge clj-merge
-                           extend clj-extend})
+                           extend clj-extend
+                           bytes clj-bytes})
   (:require [clojure.math.numeric-tower :as math]
+            [clojure.spec.alpha :as s]
             [mix-machine.char :as ch]))
 
 ;; NOTE - word is used rather loosely in here
@@ -12,61 +14,27 @@
 ;; Byte: 0-63
 ;; Sign: + or -
 ;; Word: Sign, 5 bytes
+(def non-neg-int? (complement neg-int?))
 
 (def byte-size 64)
-(def byte-max (dec byte-size))
 
-(defn valid-byte?
-  "Returns whether b is a valid MIX byte.
-  Valid bytes are numeric values in range [0, 64)."
-  [b]
-  (and (int? b)
-       (<= 0 b byte-max)))
+(s/def ::sign #{:plus :minus})
+(s/def ::byte (s/and int? #(< -1 % byte-size)))
+(s/def ::bytes (s/coll-of ::byte :into []))
+(s/def ::data (s/keys :req [::sign ::bytes]))
+(s/def ::int-or-bytes (s/or :i int? :bs ::bytes))
 
-(defn valid-bytes?
-  "Returns whether bs is a collection of valid bytes."
-  [bs]
-  (not (some (complement valid-byte?) bs)))
-
-(def valid-sign? #{:plus :minus})
-
-(defn count-bytes
-  "Return the number of bytes of the data"
+(defn sign
   [data]
-  (count (:bytes data)))
+  {:pre [(s/valid? ::data data)]
+   :post [(s/valid? ::sign %)]}
+  (::sign data))
 
-(defn negate
-  "Negates the sign of a the data."
+(defn bytes
   [data]
-  (update data :sign #({:plus :minus :minus :plus} %)))
-
-(defn set-sign
-  "Set the sign of word."
-  [data sign]
-  (assoc data :sign sign))
-
-(defn truncate
-  "Truncates some data by dropping the first (left-most) bytes 1, 2, 3, etc...
-  Example, truncate 5 to 2 bytes: S|b1|b2|b3|b4|b5 => S|b4|b5."
-  [data size]
-  (if (< size (count-bytes data))
-    (update data :bytes #(->> % reverse (take size) reverse vec))
-    data))
-
-(defn extend
-  "Extend data to fit the new size (expected to be bigger).
-  Extends by adding 0s to the left.
-  Example, extend 2 to 5 bytes: S|b1|b2 => S|0|0|0|b1|b2."
-  [data size]
-  (if (> size (count-bytes data))
-    (update data :bytes #(into (vec (repeat (- size (count %)) 0)) %))
-    data))
-
-(defn set-size
-  "Fixes the data size to a new size, which can be bigger or smaller.
-  To save information, extension (if necessary) is performed before truncation."
-  [data size]
-  (-> data (extend size) (truncate size)))
+  {:pre [(s/valid? ::data data)]
+   :post (s/valid? ::bytes %)}
+  (::bytes data))
 
 (defn new-data
   "Create new MIX data of a given size.
@@ -74,19 +42,76 @@
   or a vector of bytes is provided.
   If a number is given, the new data will contain that number of bytes,
   initialized to 0.  Otherwise, the bytes given will be used."
-  ([num-bytes]
-   (new-data :plus num-bytes))
+  ([num-or-bytes]
+   (new-data :plus num-or-bytes))
   ([sign num-or-bytes]
-   (when-not (valid-sign? sign)
-     (throw (ex-info "new-data: Invalid sign" {:arg sign})))
-   (cond
-     (int? num-or-bytes) {:sign sign :bytes (vec (repeat num-or-bytes 0))}
-     (sequential? num-or-bytes) (if-not (valid-bytes? num-or-bytes)
-                                  (throw (ex-info "new-data: Invalid bytes"
-                                                  {:arg num-or-bytes}))
-                                  {:sign sign :bytes (vec num-or-bytes)})
-     :else (throw (ex-info "new-data: Expected a number or vector"
-                           {:arg num-or-bytes})))))
+   {:pre [(s/valid? ::sign sign)]
+    :post [(s/valid? ::data %)]}
+   ;; NOTE - Validation num-or-bytes this way to provide more detail in error cases.
+   (let [bytes-arg (s/conform ::int-or-bytes num-or-bytes)]
+     (when (s/invalid? bytes-arg)
+       (throw (ex-info "Invalid argument"
+                       (s/explain-data ::int-or-bytes num-or-bytes))))
+     (let [[k v] bytes-arg]
+       (case k
+         :i {::sign sign ::bytes (vec (repeat v 0))}
+         :bs {::sign sign ::bytes v})))))
+
+(defn count-bytes
+  "Return the number of bytes of the data"
+  [data]
+  {:pre [(s/valid? ::data data)]
+   :post [(s/valid? int? %)]}
+  (count (::bytes data)))
+
+(defn negate
+  "Negates the sign of a the data."
+  [data]
+  {:pre [(s/valid? ::data data)]
+   :post [(s/valid? ::data %)]}
+  (update data ::sign #({:plus :minus :minus :plus} %)))
+
+(defn set-sign
+  "Set the sign of word."
+  [data sign]
+  {:pre [(s/valid? ::data data)
+         (s/valid? ::sign sign)]
+   :post [(s/valid? ::data %)]}
+  (assoc data ::sign sign))
+
+(defn truncate
+  "Truncates some data by dropping the first (left-most) bytes 1, 2, 3, etc...
+  Example, truncate 5 to 2 bytes: S|b1|b2|b3|b4|b5 => S|b4|b5."
+  [data size]
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? size)]
+   :post [(s/valid? ::data %)]}
+  (let [n (count-bytes data)]
+    (if (< size n)
+      (update data ::bytes #(->> % (drop (- n size)) vec))
+      data)))
+
+(defn extend
+  "Extend data to fit the new size (expected to be bigger).
+  Extends by adding 0s to the left.
+  Example, extend 2 to 5 bytes: S|b1|b2 => S|0|0|0|b1|b2."
+  [data size]
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? size)]
+   :post [(s/valid? ::data %)]}
+  (let [n (count-bytes data)]
+    (if (> size n)
+      (update data ::bytes #(into (vec (repeat (- size n) 0)) %))
+      data)))
+
+(defn set-size
+  "Fixes the data size to a new size, which can be bigger or smaller.
+  To save information, extension (if necessary) is performed before truncation."
+  [data size]
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? size)]
+   :post (s/valid? ::data %)}
+  (-> data (extend size) (truncate size)))
 
 (defn data->num
   "Determine the numeric representation of a unit of MIX data.
@@ -94,8 +119,11 @@
   ([data]
    (if (nil? data)
      0
-     (data->num (:sign data) (:bytes data))))
+     (data->num (::sign data) (::bytes data))))
   ([sign bytes]
+   {:pre [(s/valid? ::sign sign)
+          (s/valid? ::bytes bytes)]
+    :post [(s/valid? int? %)]}
    ;; Bytes can only contain values between 0-63,
    ;; i.e. 64 values.
    ;; So we can treat each byte as a potition in a base-64 number
@@ -122,6 +150,9 @@
   ([num]
    (num->data num nil))
   ([num size]
+   {:pre [(s/valid? int? num)
+          (s/valid? non-neg-int? size)]
+    :post [(s/valid? ::data %)]}
    (let [sign (if (< num 0) :minus :plus)
          bytes (loop [bytes (list) n (math/abs num)]
                  (let [q (quot n byte-size)
@@ -141,7 +172,9 @@
   This function returns (only) as many bytes as is necessary to represent the result!
   If the result is 0, the sign of the first data element is used as the sign of the result."
   [& data]
-  (let [sign (:sign (first data))
+  {:pre [(s/valid? (s/coll-of ::data) data)]
+   :post [(s/valid? ::data %)]}
+  (let [sign (::sign (first data))
         result (reduce + 0 (map data->num data))]
     ;; If the result is 0, we'll keep the sign of the first data element
     (if (= 0 result)
@@ -155,7 +188,10 @@
   If data's bytes cannot be split up evenly, the last chunk will
   have the remaining bytes."
   [data size]
-  (let [{:keys [sign bytes]} data]
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? size)]
+   :post [(s/valid? (s/coll-of ::data :count 2 :kind vector?) %)]}
+  (let [{sign ::sign bytes ::bytes} data]
     (loop [parts [] rem bytes]
       (if (empty? rem)
         parts
@@ -165,8 +201,10 @@
 (defn merge
   "Merge data together, keeping the sign of the first."
   [& data]
-  (let [sign (:sign (first data))]
-    (new-data sign (apply into (map :bytes data)))))
+  {:pre [(s/valid? (s/coll-of ::data) data)]
+   :post [(s/valid? ::data %)]}
+  (let [sign (::sign (first data))]
+    (new-data sign (apply into (map ::bytes data)))))
 
 (defn shift-left
   "Shift n bytes left.
@@ -175,7 +213,10 @@
   Sign is unchanged.
   Example: +|1|2|3|4|5 shift 3 => +|4|5|0|0|0."
   [data n]
-  (let [{:keys [sign bytes]} data
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? n)]
+   :post [(s/valid? ::data %)]}
+  (let [{sign ::sign bytes ::bytes} data
         shift (min (count bytes) n)]
     (new-data sign (concat (drop shift bytes)
                            (repeat shift 0)))))
@@ -187,7 +228,10 @@
   Sign is unchanged.
   Example: +|1|2|3|4|5 shift 3 => +|0|0|0|1|2."
   [data n]
-  (let [{:keys [sign bytes]} data
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? n)]
+   :post (s/valid? ::data %)}
+  (let [{sign ::sign bytes ::bytes} data
         num-bytes (count bytes)
         shift (min num-bytes n)
         keep (- num-bytes shift)]
@@ -200,7 +244,10 @@
   Sign is unchanged.
   Example: +|1|2|3|4|5 cycle 3 => +|4|5|1|2|3."
   [data n]
-  (let [{:keys [sign bytes]} data
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? n)]
+   :post [(s/valid? ::data %)]}
+  (let [{sign ::sign bytes ::bytes} data
         shift (mod n (count bytes))]
     (new-data sign (concat (drop shift bytes)
                            (take shift bytes)))))
@@ -211,7 +258,10 @@
   Sign is unchanged.
   Example: +|1|2|3|4|5 cycle 3 => +|3|4|5|1|2."
   [data n]
-  (let [{:keys [sign bytes]} data
+  {:pre [(s/valid? ::data data)
+         (s/valid? non-neg-int? n)]
+   :post [(s/valid? ::data %)]}
+  (let [{sign ::sign bytes ::bytes} data
         num-bytes (count bytes)
         shift (mod n (count bytes))
         keep (- num-bytes shift)]
@@ -228,8 +278,12 @@
 
 (defn data->chars
   [data]
-  (vec (map ch/code->char (:bytes data))))
+  {:pre [(s/valid? ::data data)]
+   :post [(s/valid? (s/coll-of char?) %)]}
+  (vec (map ch/code->char (::bytes data))))
 
 (defn chars->data
   [chs]
+  {:pre [(s/valid? (s/coll-of char?) chs)]
+   :post [(s/valid? ::data %)]}
   (new-data :plus (map ch/char->code chs)))

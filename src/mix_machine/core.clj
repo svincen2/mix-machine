@@ -1,10 +1,13 @@
 (ns mix-machine.core
   (:require [mix-machine.console :as console]
             [mix-machine.data :as d]
-            ;; [mix-machine.debug :refer [debug]] ;; I wonder why debug doesn't want to work???
+            [mix-machine.debug :as debug] ;; I wonder why debug doesn't want to work???
             [mix-machine.device :as dev]
             [mix-machine.machine :as m]
             [mix-machine.operations :as ops]))
+
+;; NOTE This is just testing stuff...
+;; TODO We should do some testing
 
 ;; MIX (1009) is a hypothetical machine created by Knuth,
 ;; defined in The Art of Computer Programming, Vol 1, Sec. 1.3

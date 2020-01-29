@@ -48,7 +48,7 @@
   a certain number of bytes."
   [word field]
   (let [{:keys [left right]} field
-        {:keys [sign bytes]} word]
+        {sign ::d/sign bytes ::d/bytes} word]
     (d/new-data (if (= 0 left) sign :plus)
                 (subvec bytes (max 0 (dec left)) right))))
 
@@ -60,8 +60,8 @@
   leaving source, dest, and field untouched."
   [source dest field]
   (let [{:keys [left right]} field
-        {s1 :sign b1 :bytes} source
-        {s2 :sign b2 :bytes} dest
+        {s1 ::d/sign b1 ::d/bytes} source
+        {s2 ::d/sign b2 ::d/bytes} dest
         left-byte (max 0 (dec left))
         range-size (- right left-byte)
         nb1 (drop (- (count b1) range-size) b1)]

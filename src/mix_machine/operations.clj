@@ -7,7 +7,8 @@
             [mix-machine.data :as d]
             [mix-machine.char :as ch]
             [mix-machine.console :as console]
-            [mix-machine.device :as dev]))
+            [mix-machine.device :as dev]
+            [clojure.spec.alpha :as s]))
 
 (def DEBUG false)
 (def PRINT true)
@@ -135,7 +136,7 @@
         new-word (d/num->data result)
         ;; IF result = 0, then the sign stays the same.
         sign-adj (if (= 0 result)
-                   (d/set-sign new-word (:sign op1))
+                   (d/set-sign new-word (d/sign op1))
                    new-word)
         ;; If result is too big, overflow is set, otherwise it stays the same.
         overflow (or (> (d/count-bytes sign-adj) 5)
@@ -247,7 +248,7 @@
       (let [result-A (d/num->data (quot rAX V))
             result-X (-> (rem rAX V)
                          d/num->data
-                         (d/set-sign (:sign contents-A)))
+                         (d/set-sign (d/sign contents-A)))
             ;; Need to also check for overflow here...
             overflow (or (> (d/count-bytes result-A) 5)
                          (m/get-overflow machine))]
@@ -498,7 +499,7 @@
   [shift M F machine]
   (let [contents-A (m/get-register machine :A)
         contents-X (m/get-register machine :X)
-        sign-X (:sign contents-X)
+        sign-X (d/sign contents-X)
         contents-AX (d/merge contents-A contents-X)
         shifted (shift contents-AX (d/data->num M))
         [rA rX] (d/split shifted 5)]
@@ -596,7 +597,7 @@
         contents-X (m/get-register machine :X)
         contents-AX (d/merge contents-A contents-X)
         result (->> contents-AX
-                    (:bytes)
+                    (d/bytes)
                     (map (fn [b] (str (mod b 10))))
                     (apply str)
                     (Integer/parseInt)
@@ -613,8 +614,8 @@
   The signs of both rA and rX are unchanged."
   [M F machine]
   (let [contents-A (m/get-register machine :A)
-        sign-A (:sign contents-A)
-        sign-X (:sign (m/get-register machine :X))
+        sign-A (d/sign contents-A)
+        sign-X (d/sign (m/get-register machine :X))
         n (math/abs (d/data->num contents-A))
         result (->> n
                     (format "%010d")
@@ -856,8 +857,8 @@
   F - the F modification (typically a field specification)
   op - the operation."
   [machine inst]
-  (let [sign (:sign inst)
-        [a1 a2 idx fmod code] (:bytes inst)
+  (let [sign (d/sign inst)
+        [a1 a2 idx fmod code] (d/bytes inst)
         M (create-indexed-address machine sign a1 a2 idx)]
     (when PRINT
       (println "\nDecode Instruction")

@@ -1,14 +1,15 @@
 (ns mix-machine.console
   (:require [mix-machine.machine :as m]
-            [mix-machine.debug :refer [debug]]))
+            [mix-machine.data :as d]
+            [mix-machine.debug :as debug]))
 
 (defn sign->str
   [data]
-  (get {:plus "+" :minus "-"} (:sign data)))
+  (get {:plus "+" :minus "-"} (d/sign data)))
 
 (defn bytes->str
   [data]
-  (->> (:bytes data)
+  (->> (d/bytes data)
        (map #(format "%2d" %))
        (interpose "|")
        (apply str)))
@@ -55,5 +56,5 @@
 (defn print-device
   [machine d]
   (let [device (m/get-device machine d)]
-    (debug device) ;; TODO - debug is not appropriate here... this is dev oriented output
+    (debug/debug device) ;; TODO - debug is not appropriate here... this is dev oriented output
     machine))
