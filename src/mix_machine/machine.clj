@@ -62,21 +62,21 @@
 (defn- set-index-register
   [machine i data]
   (if (<= 1 i 6)
-    (assoc-in machine [:registers :I i] (d/set-size data 2))
+    (assoc-in machine [:registers :I i] (d/resize data 2))
     (throw (ex-info "set-index-register: Unknown register" {:i i :data data}))))
 
 (defn- set-jump-register
   [machine data]
   (assoc-in machine [:registers :J] (-> data
                                         (d/set-sign :plus)
-                                        (d/set-size 2))))
+                                        (d/resize 2))))
 
 (defn set-register
   [machine r data]
   (cond
     (coll? r) (let [[_ i] r] (set-index-register machine i data))
     (= :J r) (set-jump-register machine data)
-    (#{:A :X} r) (assoc-in machine [:registers r] (d/set-size data 5))
+    (#{:A :X} r) (assoc-in machine [:registers r] (d/resize data 5))
     :else (throw (ex-info "set-register: Unknown register" {:r r :data data}))))
 
 (defn inc-register
@@ -94,14 +94,14 @@
   [machine m data]
   (assert (<= 0 m 3999))
   (if (sequential? data)
-    (let [sized-data (map #(d/set-size % 5) data)
+    (let [sized-data (map #(d/resize % 5) data)
           data-len (count data)
           mem (:memory machine)
           front (take m mem)
           back (drop (+ m data-len) mem)
           mem2 (take 4000 (concat front sized-data back))]
       (assoc machine :memory (vec mem2)))
-    (assoc-in machine [:memory m] (d/set-size data 5))))
+    (assoc-in machine [:memory m] (d/resize data 5))))
 
 (defn get-overflow
   [machine]

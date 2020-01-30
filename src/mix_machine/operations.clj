@@ -89,7 +89,7 @@
   (let [field (fs/decode-field-spec F)
         register (-> (m/get-register machine reg (d/new-data 5))
                      ;; Extend smaller registers
-                     (d/extend 5))
+                     (d/resize 5))
         content-M (m/get-memory machine (d/data->num M))
         new-word (fs/store-field-spec register content-M field)]
     (when DEBUG
@@ -334,7 +334,7 @@
   (let [field (fs/decode-field-spec F)
         contents-R (-> (m/get-register machine reg)
                        ;; Need to shift the smaller registers before loading the field
-                       (d/set-size 5)
+                       (d/resize 5)
                        (fs/load-field-spec field))
         contents-M (-> (m/get-memory machine (d/data->num M))
                        (fs/load-field-spec field))
@@ -621,7 +621,7 @@
                     (ch/str->code)
                     (d/new-data sign-A))
         [rA rX] (-> result
-                    (d/extend 10)
+                    (d/resize 10)
                     (d/split 5))]
     (-> machine
         (m/set-register :A rA)
@@ -861,7 +861,7 @@
         M (create-indexed-address machine sign a1 a2 idx)]
     (when PRINT
       (println "\nDecode Instruction")
-      (println (format "-- %-7s %20d" "Address" (d/data->num sign [a1 a2])))
+      (println (format "-- %-7s %20d" "Address" (d/data->num (d/new-data sign [a1 a2]))))
       (println (format "-- %-7s %20d" "Index" idx))
       (println (format "-- %-15s %12s" "F modification"
                        (str fmod " " (fs/field-spec-str fmod))))
