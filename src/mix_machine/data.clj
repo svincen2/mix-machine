@@ -55,6 +55,12 @@
 
 (def non-neg-int? (partial spec/valid? non-neg-int-spec))
 
+(def char-seq-spec
+  [[sequential? "sequence"]
+   [#(not (some (complement char?) %)) "characters"]])
+
+(def valid-char-seq? (partial spec/valid? char-seq-spec))
+
 ;; -----------------------------------------------------------------------------------------------
 
 ;; Assertions ------------------------------------------------------------------------------------
@@ -64,32 +70,42 @@
 (defmacro assert-valid-sign
   [sign]
   `(assert (valid-sign? ~sign)
-           ~(str "Expected " (spec/explain sign-spec sign) ", found " sign)))
+           (str "Expected " (spec/explain ~sign-spec ~sign) ", found " ~sign)))
 
 (defmacro assert-valid-byte
   [byte]
   `(assert (valid-byte? ~byte)
-           ~(str "Expected " (spec/explain byte-spec byte) ", found " byte)))
+           (str "Expected " (spec/explain ~byte-spec ~byte) ", found " ~byte)))
 
 (defmacro assert-valid-bytes
   [bytes]
   `(assert (valid-bytes? ~bytes)
-           ~(str "Expected " (spec/explain byte-seq-spec bytes) ", found " bytes)))
+           (str "Expected " (spec/explain ~byte-seq-spec ~bytes) ", found " ~bytes)))
 
 (defmacro assert-valid-data
   [data]
   `(assert (valid-data? ~data)
-           ~(str "Expected " (spec/explain data-spec data) ", found " data)))
+           (str "Expected " (spec/explain ~data-spec ~data) ", found " ~data)))
 
 (defmacro assert-data-seq
   [ds]
   `(assert (valid-data-seq? ~ds)
-           ~(str "Expected " (spec/explain data-seq-spec ds) ", found " ds)))
+           (str "Expected " (spec/explain ~data-seq-spec ~ds) ", found " ~ds)))
 
 (defmacro assert-non-neg-int
   [n]
   `(assert (non-neg-int? ~n)
-           ~(str "Expected " (spec/explain non-neg-int-spec n) ", found " n)))
+           (str "Expected " (spec/explain ~non-neg-int-spec ~n) ", found " ~n)))
+
+(defmacro assert-pos-int
+  [n]
+  `(assert (pos-int? ~n)
+           (str "Expected positive integer, found " ~n)))
+
+(defmacro assert-char-seq
+  [chs]
+  `(assert (valid-char-seq? ~chs)
+           (str "Expected " (spec/explain ~char-seq-spec ~chs) ", found " ~chs)))
 
 ;; -----------------------------------------------------------------------------------------------
 
@@ -190,9 +206,7 @@
                    "integer or valid bytes"
                    (with-out-str (pr num-or-bytes))))
    (cond
-     ;; (int? num-or-bytes) (->Record sign (vec (repeat num-or-bytes 0)))
      (int? num-or-bytes) {:sign sign :bytes (vec (repeat num-or-bytes 0))}
-     ;; (sequential? num-or-bytes) (->Record sign (vec num-or-bytes))
      (sequential? num-or-bytes) {:sign sign :bytes (vec num-or-bytes)}
      ;; NOTE - This shouldn't happen (below)
      ;; But just in case I'll leave it in for now...
@@ -250,8 +264,6 @@
   This function returns (only) as many bytes as is necessary to represent the result!
   If the result is 0, the sign of the first data element is used as the sign of the result."
   [& data]
-  ;; (assert-record-sequence data)
-  ;; (doall (map #(assert-valid-data %) data))
   (assert-data-seq data)
   (let [sign (get-sign (first data))
         result (reduce + 0 (map data->num data))]
@@ -268,8 +280,7 @@
   have the remaining bytes."
   [data size]
   (assert-valid-data data)
-  (assert (and (int? size)
-               (< 0 size (count-bytes data))))
+  (assert-pos-int size)
   (let [{:keys [sign bytes]} data]
     (loop [parts [] rem bytes]
       (if (empty? rem)
@@ -280,11 +291,9 @@
 (defn merge
   "Merge data together, keeping the sign of the first."
   [& data]
-  ;; (assert-record-sequence data)
-  ;; (doall (map #(assert-valid-data %) data))
   (assert-data-seq data)
   (let [sign (get-sign (first data))]
-    (new-data sign (apply into (map get-bytes data)))))
+    (new-data sign (apply concat (map get-bytes data)))))
 
 (defn shift-left
   "Shift n bytes left.
@@ -324,10 +333,12 @@
   [data n]
   (assert-valid-data data)
   (assert-non-neg-int n)
-  (let [{:keys [sign bytes]} data
-        shift (mod n (count bytes))]
-    (new-data sign (concat (drop shift bytes)
-                           (take shift bytes)))))
+  (if (empty? (get-bytes data))
+    data
+    (let [{:keys [sign bytes]} data
+          shift (mod n (count bytes))]
+      (new-data sign (concat (drop shift bytes)
+                             (take shift bytes))))))
 
 (defn cycle-right
   "Cycle n bytes right.
@@ -337,12 +348,14 @@
   [data n]
   (assert-valid-data data)
   (assert-non-neg-int n)
-  (let [{:keys [sign bytes]} data
-        num-bytes (count bytes)
-        shift (mod n (count bytes))
-        keep (- num-bytes shift)]
-    (new-data sign (concat (drop keep bytes)
-                           (take keep bytes)))))
+  (if (empty? (get-bytes data))
+    data
+    (let [{:keys [sign bytes]} data
+          num-bytes (count bytes)
+          shift (mod n (count bytes))
+          keep (- num-bytes shift)]
+      (new-data sign (concat (drop keep bytes)
+                             (take keep bytes))))))
 
 ;; (defn max-value
 ;;   "Return MIX data of size representing the max value.
@@ -359,9 +372,5 @@
 
 (defn chars->data
   [chs]
-  (assert (and (sequential? chs)
-               (not (some #(not (instance? Character %)) chs)))
-          (format "Expected %s, found %s"
-                  "Characters"
-                  (with-out-str (pr (doall (map type chs))))))
+  (assert-char-seq chs)
   (new-data :plus (map ch/char->code chs)))
