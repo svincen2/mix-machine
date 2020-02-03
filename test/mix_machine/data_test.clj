@@ -491,7 +491,6 @@
     [[\0 \1 \2]]
     [[\* \+ \-]]]
    sut/chars->data)
-  ;; Sign is always :plus
   (t/testing "returned data's sign is always :plus"
     (t/is (= :plus (sut/get-sign (sut/chars->data [\0 \1 \2]))))
     (t/is (= :plus (sut/get-sign (sut/chars->data [\A \B \C]))))

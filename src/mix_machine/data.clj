@@ -24,6 +24,8 @@
 
 (def byte-size 64)
 
+(def word-size 5)
+
 (def byte-spec
   [[int? "integer"]
    [#(< -1 % byte-size) "range [0, 63)"]])
